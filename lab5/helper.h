@@ -88,10 +88,12 @@
 #define get_func_tylist(x) (x->u.fun.formals)
 
 //------------------ lab5 ----------------------
-#define get_var_access(x) (x->u.var.access)
+#define get_varentry_access(x) (x->u.var.access)
 #define get_func_label(x) (x->u.fun.label)
 #define get_func_level(x) (x->u.fun.level)
 
-
+//s:T_stm
+#define get_cjump_true(s) (s->u.CJUMP.true)
+#define get_cjump_false(s) (s->u.CJUMP.false)
 
 #endif

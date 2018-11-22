@@ -20,6 +20,17 @@ Temp_label F_name(F_frame f);
 F_accessList F_formals(F_frame f);
 F_access F_allocLocal(F_frame f, bool escape);
 
+/* declaration for IR translation 
+struct F_access_ {
+	enum {inFrame, inReg} kind;
+	union {
+		int offset; //inFrame
+		Temp_temp reg; //inReg
+	} u;
+};*/
+Temp_temp F_FP(void);
+extern const int F_wordsize;
+T_exp F_exp(F_access acc, T_exp framePtr);
 
 
 

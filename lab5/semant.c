@@ -60,6 +60,7 @@ U_boolList makeBoolList(A_fieldList list){
 	}
 }
 
+//params alloc wait to be reset
 void enterParams(S_table venv, S_table tenv, A_fieldList list, Tr_level level){
 	A_fieldList params;
 	for(params=list; params; params=params->tail){
@@ -175,8 +176,7 @@ int checkFuncRepeat(A_fundecList list, S_symbol name){
 }
 
 
-
-
+/* core functions */
 F_fragList SEM_transProg(A_exp exp){
 
 	//TODO LAB5: do not forget to add the main frame
@@ -414,7 +414,7 @@ struct expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_labe
 
 			E_enventry x = S_look(venv, simple) ;
 			if  ( x && x->kind == E_varEntry ) 
-				return expTy(NULL, get_varentry_type(x));
+				return expTy(Tr_simpleVar(get_varentry_access(x),l), get_varentry_type(x));
 			else  {
 				EM_error(v->pos, "undefined variable %s", S_name(simple));
 				return expTy(NULL, Ty_Int());
@@ -429,11 +429,14 @@ struct expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_labe
 				Ty_ty ty = get_varentry_type(x);
 				if(actualTy(ty)->kind == Ty_record){
 					ty = actualTy(ty);
+					int cnt = 0;
 					for(Ty_fieldList record=ty->u.record;record;record=record->tail){
 						Ty_field field = record->head;
 						if(S_name(field->name) == S_name(sym)){
-							return expTy(NULL, field->ty);
+							Tr_access acc = get_varentry_access(x);
+							return expTy(Tr_fieldVar(acc,l,cnt), field->ty);
 						}
+						cnt += 1;
 					}
 					EM_error(v->pos, "field %s doesn\'t exists", S_name(sym));
 					return expTy(NULL, Ty_Int());
@@ -457,8 +460,14 @@ struct expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_labe
 			if  ( x && x->kind == E_varEntry ) {
 				Ty_ty ty = get_varentry_type(x);
 				if(actualTy(ty)->kind == Ty_array){
+					if(ex->kind != A_intExp){
+						EM_error(var->pos, "array subscirpt not int");
+						return expTy(NULL, Ty_Int());
+					}
 					ty = actualTy(ty);
-					return expTy(NULL, ty->u.array);
+					Tr_access acc = get_varentry_access(x);
+					int off = ex->u.intt;
+					return expTy(Tr_subscriptVar(acc,l,off), ty->u.array);
 				}
 				else{
 					EM_error(var->pos, "array type required");
@@ -485,10 +494,11 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			return transVar(venv, tenv, var, l, label);
 		}
 		case A_nilExp: {
-			return expTy(NULL, Ty_Nil());
+			return expTy(Tr_nilExp(), Ty_Nil());
 		}
 		case A_intExp: {
-			return expTy(NULL, Ty_Int());
+			int i = a->u.intt;
+			return expTy(Tr_intExp(i), Ty_Int());
 		}
 		case A_stringExp: {
 			return expTy(NULL, Ty_String());
@@ -548,17 +558,23 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					if(actualTy(r.ty)->kind != Ty_int){
 						EM_error(get_opexp_rightpos(a), "integer required");
 						return expTy(NULL, Ty_Int());
-					}
-					return expTy(NULL, Ty_Int());
+					}					
+					return expTy(Tr_arithExp(oper,l.exp,r.exp), Ty_Int());
 				}
 				//compare
 				default:
 				{
-					if(actualTy(l.ty)->kind == actualTy(r.ty)->kind && \
-					(actualTy(l.ty)->kind == Ty_record || actualTy(l.ty)->kind == Ty_array \
-					|| actualTy(l.ty)->kind == Ty_string || actualTy(l.ty)->kind == Ty_int)){
-						return expTy(NULL, Ty_Int());
-					}
+					if(actualTy(l.ty)->kind == actualTy(r.ty)->kind){
+						if(actualTy(l.ty)->kind == Ty_record || actualTy(l.ty)->kind == Ty_array){
+							return expTy(Tr_ptrCompExp(oper,l.exp,r.exp), Ty_Int());
+						}
+						if(actualTy(l.ty)->kind == Ty_string){
+							return expTy(Tr_strCompExp(oper,l.exp,r.exp), Ty_Int());
+						}
+						if(actualTy(l.ty)->kind == Ty_int){
+							return expTy(Tr_intCompExp(oper,l.exp,r.exp), Ty_Int());
+						}
+					} 					
 					else{
 						EM_error(get_opexp_leftpos(a), "same type required");
 						return expTy(NULL, Ty_Int());
@@ -645,7 +661,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 
 			if(actualTy(elsety.ty)->kind == Ty_nil){
 				if(actualTy(thenty.ty)->kind == Ty_void){
-					return expTy(NULL, elsety.ty);
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), elsety.ty);
 				}
 				else{
 					EM_error(a->pos, "if-then exp's body must produce no value");
@@ -654,7 +670,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			}
 			else{
 				if(actualTy(thenty.ty)->kind == actualTy(elsety.ty)->kind){
-					return expTy(NULL, elsety.ty);
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), elsety.ty);
 				}
 				else{
 					EM_error(a->pos, "then exp and else exp type mismatch");

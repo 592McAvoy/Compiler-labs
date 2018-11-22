@@ -11,7 +11,7 @@
 
 /*Lab5: Your implementation here.*/
 
-#define WORDSIZE 4
+const int F_wordsize = 8;
 
 //F_frame_ in PPT
 struct F_frame_ {
@@ -42,7 +42,7 @@ struct F_access_ {
 };
 
 /* functions */
-F_access Inframe(int offset){
+static F_access Inframe(int offset){
 	F_access ac = checked_malloc(sizeof(*ac));
 
 	ac->kind = inFrame;
@@ -50,7 +50,7 @@ F_access Inframe(int offset){
 	return ac;
 }   
 
-F_access InReg(Temp_temp reg){
+static F_access InReg(Temp_temp reg){
 	F_access ac = checked_malloc(sizeof(*ac));
 
 	ac->kind = inReg;
@@ -67,21 +67,21 @@ F_accessList F_AccessList(F_access head, F_accessList tail){
 }
 
 // param position wait to be reset
-F_accessList makeAccList(U_boolList formals, int* cntp){
+F_accessList makeFormals(U_boolList formals, int* cntp){
 	bool esc = formals->head;
 	int cnt = *cntp;
 	*cntp = cnt+1;
 
 	F_access ac;
 	if(esc){
-		ac = InFrame(cnt * WORDSIZE);
+		ac = InFrame(cnt * F_wordsize);
 	}
 	else{
 		ac = InReg(Temp_newtemp());
 	}
 	
 	if(formals->tail){
-		return F_AccessList(ac, makeAccList(formals->tail, cntp));
+		return F_AccessList(ac, makeFormals(formals->tail, cntp));
 	}
 	else{
 		return F_AccessList(ac, NULL);
@@ -94,7 +94,7 @@ F_frame F_newFrame(Temp_label name, U_boolList formals){
 	*argsize = 0;
 	
 	f->name = name;
-	f->formals = makeAccList(formals, argsize);
+	f->formals = makeFormals(formals, argsize);
 	f->locals = NULL;
 	f->argSize = *argsize;
 	f->length = 0;
@@ -113,7 +113,7 @@ F_access F_allocLocal(F_frame f, bool escape){
 
 	F_access ac;
 	if(escape){
-		ac = InFrame(-length * WORDSIZE);
+		ac = InFrame(-length * F_wordsize);
 	}
 	else{
 		ac = InReg(Temp_newtemp());
@@ -132,6 +132,16 @@ F_accessList F_formals(F_frame f){
 	return f->formals;
 }
 
+/* IR translation */
+T_exp F_exp(F_access acc, T_exp framePtr){
+	if(acc->kind == inFrame){
+		int off = acc->u.offset;
+		return T_Mem(T_Binop(T_plus, T_Const(off), framePtr));
+	}
+	else{
+		return T_Temp(acc->u.reg);
+	}
+}
 
 F_frag F_StringFrag(Temp_label label, string str) {   
 	    return NULL;                                      

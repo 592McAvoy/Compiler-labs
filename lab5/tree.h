@@ -18,29 +18,33 @@ typedef enum {T_plus, T_minus, T_mul, T_div,
 typedef enum  {T_eq, T_ne, T_lt, T_gt, T_le, T_ge,
 		T_ult, T_ule, T_ugt, T_uge} T_relOp;
 
-struct T_stm_ {enum {T_SEQ, T_LABEL, T_JUMP, T_CJUMP, T_MOVE,
+struct T_stm_ {
+	enum {T_SEQ, T_LABEL, T_JUMP, T_CJUMP, T_MOVE,
 		       T_EXP} kind;
-	       union {struct {T_stm left, right;} SEQ;
-		      Temp_label LABEL;
-		      struct {T_exp exp; Temp_labelList jumps;} JUMP;
-		      struct {T_relOp op; T_exp left, right;
-			      Temp_label true, false;} CJUMP;
-		      struct {T_exp dst, src;} MOVE;
-		      T_exp EXP;
-		    } u;
-	     };
+	union {
+		struct {T_stm left, right;} SEQ;//SEQ
+		Temp_label LABEL;//LABEL
+		struct {T_exp exp; Temp_labelList jumps;} JUMP;//JUMP
+		struct {T_relOp op; T_exp left, right;
+			      Temp_label true, false;} CJUMP;//CJUMP
+		struct {T_exp dst, src;} MOVE;//MOVE
+		T_exp EXP;//EXP
+		} u;
+};
 
-struct T_exp_ {enum {T_BINOP, T_MEM, T_TEMP, T_ESEQ, T_NAME,
+struct T_exp_ {
+	enum {T_BINOP, T_MEM, T_TEMP, T_ESEQ, T_NAME,
 		      T_CONST, T_CALL} kind;
-	      union {struct {T_binOp op; T_exp left, right;} BINOP;
-		     T_exp MEM;
-		     Temp_temp TEMP;
-		     struct {T_stm stm; T_exp exp;} ESEQ;
-		     Temp_label NAME;
-		     int CONST;
-		     struct {T_exp fun; T_expList args;} CALL;
-		   } u;
-	    };
+	union {
+		struct {T_binOp op; T_exp left, right;} BINOP;//BINOP
+		T_exp MEM;//MEM
+		Temp_temp TEMP;//TEMP
+		struct {T_stm stm; T_exp exp;} ESEQ;//ESEQ
+		Temp_label NAME;//NAME
+		int CONST;//CONST
+		struct {T_exp fun; T_expList args;} CALL;//CALL
+	} u;
+};
 
 T_expList T_ExpList (T_exp head, T_expList tail);
 T_stmList T_StmList (T_stm head, T_stmList tail);
