@@ -26,6 +26,8 @@ Tr_accessList Tr_formals(Tr_level level);
 
 Tr_access Tr_allocLocal(Tr_level level, bool escape);
 
+typedef struct Tr_expList_ *Tr_expList;
+Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail);
 /* IR translation 
 struct Tr_access_ {
 	Tr_level level;
@@ -49,82 +51,20 @@ Tr_exp Tr_fieldVar(Tr_access acc, Tr_level l, int cnt);
 Tr_exp Tr_subscriptVar(Tr_access acc, Tr_level l, int off);
 
 //transExp
-Tr_exp Tr_nilExp(){
-    return Tr_Ex(T_Const(0));
-}
-Tr_exp Tr_intExp(int i){
-    return Tr_Ex(T_Const(i));
-}
-Tr_exp Tr_stringExp;
-Tr_exp Tr_callExp;
-Tr_exp Tr_arithExp(A_oper op, Tr_exp left, Tr_exp right){
-    T_binOp bop;
-    switch(op){
-        case A_plusOp:bop=T_plus;break;
-        case A_minusOp:bop=T_minus;break;
-        case A_timesOp:bop=T_mul;break;
-        case A_divideOp:bop=T_div;break;
-    }
-    T_exp e = T_Binop(bop,unEx(left),unEx(right));
-    return Tr_Ex(e);
-}
-Tr_exp Tr_intCompExp(A_oper op, Tr_exp left, Tr_exp right){
-    T_relOp rop;
-    switch(op){
-        case A_eqOp:rop=T_eq;break;
-        case A_neqOp:rop=T_ne;break;
-        case A_ltOp:rop=T_lt;break;
-        case A_leOp:rop=T_le;break;
-        case A_gtOp:rop=T_gt;break;
-        case A_geOp:rop=T_ge;break;
-    }
-    T_stm s = T_Cjump(rop, unEx(left), unEx(right),NULL, NULL);
-    patchList trues = PatchList(&get_cjump_true(s),NULL);
-    patchList falses = PatchList(&get_cjump_false(s),NULL);
-    return Tr_Cx(trues,falses,s);
-}
-Tr_exp Tr_strCompExp(A_oper op, Tr_exp left, Tr_exp right){
-    T_relOp rop;
-    switch(op){
-        case A_eqOp:rop=T_eq;break;
-        case A_neqOp:rop=T_ne;break;
-        case A_ltOp:rop=T_lt;break;
-        case A_leOp:rop=T_le;break;
-        case A_gtOp:rop=T_gt;break;
-        case A_geOp:rop=T_ge;break;
-    }
-    //to be realize;
-    return NULL;
-}
-Tr_exp Tr_ptrCompExp(A_oper op, Tr_exp left, Tr_exp right){
-    T_relOp rop;
-    switch(op){
-        case A_eqOp:rop=T_eq;break;
-        case A_neqOp:rop=T_ne;break;
-        case A_ltOp:rop=T_lt;break;
-        case A_leOp:rop=T_le;break;
-        case A_gtOp:rop=T_gt;break;
-        case A_geOp:rop=T_ge;break;
-    }
-    //to be realize;
-    return NULL;
-}
-Tr_exp Tr_recordExp;
-Tr_exp Tr_assignExp;
-Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
-    Temp_label t = Temp_newlabel();
-    Temp_label f = Temp_newlabel();
-    struct Cx testCx = unCx(test);
-    doPatch(testCx.u.trues, t);
-    doPatch(testCx.u.falses,f);
+Tr_exp Tr_nilExp();
+Tr_exp Tr_intExp(int i);
+Tr_exp Tr_stringExp(string str);
+Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl);
+Tr_exp Tr_arithExp(A_oper op, Tr_exp left, Tr_exp right);
+Tr_exp Tr_intCompExp(A_oper op, Tr_exp left, Tr_exp right);
+Tr_exp Tr_strCompExp(A_oper op, Tr_exp left, Tr_exp right);
+Tr_exp Tr_ptrCompExp(A_oper op, Tr_exp left, Tr_exp right);
+Tr_exp Tr_recordExp(Tr_expList list, int cnt);
+Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val);
+Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee);
+Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done);
+Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done);
+Tr_exp Tr_breakExp(Temp_label done);
+Tr_exp Tr_arrayExp(int size, Tr_exp initvar);
 
-    T_stm testStm = testCx.stm;//Cx(t,f)
-    T_stm thenStm = unNx(then);//t
-    T_stm elseStm = unNx(elsee);//f
-
-    T_stm s = T_Seq(T_Seq(testStm,
-                        T_Seq(T_Label(t),
-                            T_Seq(thenStm,
-                                T_Seq(T_label(f), elseStm)))));
-}
 #endif

@@ -133,6 +133,10 @@ F_accessList F_formals(F_frame f){
 }
 
 /* IR translation */
+Temp_temp F_FP(void){
+	return Temp_newtemp();
+}
+
 T_exp F_exp(F_access acc, T_exp framePtr){
 	if(acc->kind == inFrame){
 		int off = acc->u.offset;
@@ -143,6 +147,12 @@ T_exp F_exp(F_access acc, T_exp framePtr){
 	}
 }
 
+T_exp F_externalCall(string s, T_expList args){
+	return T_Call(T_Name(Temp_namedlabel(s), args);
+}
+
+
+/* fragment */
 F_frag F_StringFrag(Temp_label label, string str) {   
 	    return NULL;                                      
 }                                                     

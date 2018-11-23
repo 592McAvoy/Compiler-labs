@@ -31,7 +31,7 @@ struct F_access_ {
 Temp_temp F_FP(void);
 extern const int F_wordsize;
 T_exp F_exp(F_access acc, T_exp framePtr);
-
+T_exp F_externalCall(string s, T_expList args);
 
 
 /* declaration for fragments */

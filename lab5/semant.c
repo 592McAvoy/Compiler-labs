@@ -501,18 +501,20 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			return expTy(Tr_intExp(i), Ty_Int());
 		}
 		case A_stringExp: {
-			return expTy(NULL, Ty_String());
+			string str = a->u.stringg;
+			return expTy(Tr_stringExp(str), Ty_String());
 		}
 		case A_callExp:{
 			S_symbol func = get_callexp_func(a); 
 			A_expList args = get_callexp_args(a);
-			//printf("func %s\n",S_name(func));
+			
 			E_enventry x = S_look(venv, func);
 			if(x && x->kind == E_funEntry){
 				Ty_tyList formals = get_func_tylist(x); 
 				Ty_ty result = get_func_res(x);
 				A_expList exps;
 				Ty_tyList tys;
+				Tr_expList ls = NULL;//parameter tr_explist
 				for(exps=args,tys=formals;exps&&tys;exps=exps->tail,tys=tys->tail){
 					A_exp param = exps->head;
 					Ty_ty ty = tys->head;
@@ -523,6 +525,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 						EM_error(param->pos, "para type mismatch");
 						return expTy(NULL, Ty_Int());
 					}
+					ls = Tr_ExpList(pp.exp, ls);
 				}
 				if(exps != NULL){
 					EM_error(a->pos, "too many params in function %s", S_name(func));
@@ -532,7 +535,9 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					EM_error(a->pos, "too less params in function %s", S_name(func));
 					return expTy(NULL, Ty_Int());
 				}
-				return expTy(NULL, result);
+				Temp_label fname =  get_func_label(x);
+				Tr_level flev =	get_func_level(x);
+				return expTy(Tr_callExp(fname, ls, flev, l), result);
 			}
 			else{
 				EM_error(a->pos, "undefined function %s", S_name(func));
@@ -593,6 +598,8 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			if(typp && typp->kind == Ty_record){
 				Ty_fieldList record;
 				A_efieldList fs;
+				Tr_expList el = NULL;
+				int cnt = 0;
 				for(record=typp->u.record, fs=fields; record&&fs; record=record->tail,fs=fs->tail){
 					Ty_field rec = record->head;
 					S_symbol rname = rec->name; Ty_ty rty = rec->ty;
@@ -606,12 +613,15 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 						EM_error(fexp->pos, "unmatch type of field %s", S_name(rname));
 						return expTy(NULL, Ty_Int());
 					}
+
+					cnt += 1;
+					el = Tr_ExpList(ety.exp, el);
 				}
 				if(record != NULL || fs != NULL){
 					EM_error(a->pos, "unmatch amount of fields");
 					return expTy(NULL, Ty_Int());
 				}
-				return expTy(NULL, type);
+				return expTy(Tr_recordExp(el, cnt), type);
 			}
 			else{
 				EM_error(a->pos, "undefined type %s", S_name(typ));
@@ -643,7 +653,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			struct expty ety = transExp(venv, tenv, ex, l, label);
 
 			if(typeEqual(vty.ty, ety.ty) == 1){
-				return expTy(NULL, Ty_Void());
+				return expTy(Tr_assignExp(vty.exp, ety.exp), Ty_Void());
 			}
 			else{
 				EM_error(a->pos, "unmatched assign exp");
@@ -682,13 +692,14 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			A_exp test = get_whileexp_test(a);
 			A_exp body = get_whileexp_body(a);
 
+			Temp_label done = Temp_newlabel();
 			struct expty testty = transExp(venv, tenv, test, l, label);
-			struct expty bodyty = transExp(venv, tenv, body, l, label);
+			struct expty bodyty = transExp(venv, tenv, body, l, done);
 
 			//Ty_print(bodyty.ty);
 
 			if(bodyty.ty->kind == Ty_void){
-				return expTy(NULL, bodyty.ty);
+				return expTy(Tr_whileExp(testty.exp, bodyty.exp, done), bodyty.ty);
 			}
 			else{
 				EM_error(body->pos, "while body must produce no value");
@@ -702,6 +713,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			A_exp hi = get_forexp_hi(a);
 			A_exp body = get_forexp_body(a);
 
+			Temp_label done = Temp_newlabel();
 			struct expty loty = transExp(venv, tenv, lo, l, label);
 			struct expty hity = transExp(venv, tenv, hi, l, label);
 
@@ -710,10 +722,10 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				S_enter(venv, var, E_ROVarEntry(
 						Tr_allocLocal(l, get_forexp_esc(a)),
 						loty.ty));
-				struct expty bodyty = transExp(venv, tenv, body, l, label);
+				struct expty bodyty = transExp(venv, tenv, body, l, done);
 				S_endScope(venv);
 				if(bodyty.ty->kind == Ty_void){
-					return expTy(NULL, bodyty.ty);
+					return expTy(Tr_forExp(loty.exp, hity.exp, bodyty.exp, done), bodyty.ty);
 				}
 				else{
 					EM_error(body->pos, "forbody must produce no value");
@@ -727,7 +739,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			
 		}
 		case A_breakExp: {
-			return expTy(NULL, Ty_Void());
+			return expTy(Tr_breakExp(label), Ty_Void());
 		}
 		case A_letExp:{
 			A_decList decs; 
@@ -762,7 +774,8 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					EM_error(a->pos, "type mismatch");
 					return expTy(NULL, Ty_Int());
 				}
-				return expTy(NULL, type);
+				int len = size->u.intt;
+				return expTy(Tr_arrayExp(len, initty.exp), type);
 			}
 			else{
 				EM_error(a->pos, "undefined type %s", S_name(typ));
