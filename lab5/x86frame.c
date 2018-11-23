@@ -113,14 +113,14 @@ F_access F_allocLocal(F_frame f, bool escape){
 
 	F_access ac;
 	if(escape){
-		ac = InFrame(-length * F_wordsize);
+		ac = InFrame(-(length+1) * F_wordsize);
 	}
 	else{
 		ac = InReg(Temp_newtemp());
 	}
 
 	f->length = length+1;
-	f->locals = F_AccessList(ac,locals);
+	f->locals = F_AccessList(ac, locals);
 
 	return ac;
 }

@@ -241,7 +241,7 @@ Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l){
 
 	//calculate SL
 	int SLoff = F_wordsize;//SL is 1 wordsize off FP
-	while(l!=vl){
+	while(l != vl){
 		fp = T_Mem(T_Binop(T_plus, T_Const(SLoff), fp));
 		l = l->parent;
 	}

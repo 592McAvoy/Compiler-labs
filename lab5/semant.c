@@ -260,7 +260,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 
 				if(checkTypeRepeat(types,name) != 1){
 					EM_error(d->pos, "two types have the same name");
-					return; 
+					return Tr_typeDec(); 
 				}
 				S_enter(tenv,name,Ty_Name(name, transTy(tenv,ty)));
 			}
@@ -277,13 +277,12 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				S_symbol name = type->name; 
 				if(!actualTy(S_look(tenv, name))){
 					EM_error(d->pos, "illegal type cycle");
-					return; 
+					return Tr_typeDec(); 
 				}
 			}
-			return;
+			return Tr_typeDec(); 
 		}
 		case A_varDec:{
-			//printf("var dec\n");
 			S_symbol var = get_vardec_var(d);
 			S_symbol typ = get_vardec_typ(d);
 			A_exp init = get_vardec_init(d);
@@ -293,27 +292,26 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 
 			if(typ){
 				Ty_ty ty = S_look(tenv, typ);
-				//if(actualTy(ty)->kind == actualTy(initty.ty)->kind){
 				if(typeEqual(ty, initty.ty) == 1){
-					S_enter(venv, var, E_VarEntry(
-						Tr_allocLocal(l, esc),
-						ty));
+					Tr_access acc = Tr_allocLocal(l, esc);
+					S_enter(venv, var, E_VarEntry(acc, ty));
+					return Tr_varDec(acc, initty.exp);
 				}
 				else{
 					EM_error(d->pos, "type mismatch");
+					return Tr_typeDec(); 
 				}
 			}
 			else{
 				if(actualTy(initty.ty)->kind == Ty_nil){
 					EM_error(d->pos, "init should not be nil without type specified");
-					return;
+					return Tr_typeDec(); 
 				}
-				S_enter(venv, var, E_VarEntry(
-						Tr_allocLocal(l, esc),
-						initty.ty));
-			}
+				Tr_access acc = Tr_allocLocal(l, esc);
+				S_enter(venv, var, E_VarEntry(acc, initty.ty));
+				return Tr_varDec(acc, initty.exp);
+			}	
 			
-			return;
 		}		
 		case A_functionDec:{
 			A_fundecList funcs;

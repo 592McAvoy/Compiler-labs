@@ -67,4 +67,14 @@ Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done);
 Tr_exp Tr_breakExp(Temp_label done);
 Tr_exp Tr_arrayExp(int size, Tr_exp initvar);
 
+//transDec
+Tr_exp Tr_typeDec(){
+    return Tr_Ex(T_Const(0));
+}
+Tr_exp Tr_varDec(Tr_access acc, Tr_exp init){
+    T_exp pos = unEx(Tr_simpleVar(acc, acc->level));
+    return Tr_Nx(T_Move(pos, unEx(init)));
+}
+Tr_exp Tr_functionDec;
+
 #endif
