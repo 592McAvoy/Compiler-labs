@@ -37,7 +37,8 @@ int main(int argc, char **argv){
   parse(argv[1]);
   //pr_exp(stderr,absyn_root,0);
   if (absyn_root){
-    pr_exp(stderr, absyn_root,0);
+    //pr_exp(stderr, absyn_root,0);
+    //printf("\n");
   	F_fragList flist = SEM_transProg(absyn_root);
 	int k = 0;
 	for (; flist; flist = flist->tail) k++;

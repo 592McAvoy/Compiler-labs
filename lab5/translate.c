@@ -161,8 +161,13 @@ static struct Cx unCx(Tr_exp e){
 			}*/
 			return cx;
 		}
-		case Tr_nx:
+		case Tr_nx:{
+            cx.trues = NULL;
+            cx.falses = NULL;
+            cx.stm = NULL;
+            //printf("error");
 			/*error*/ return cx;
+        }
 		case Tr_cx:
 			return e->u.cx;
 	}
@@ -226,6 +231,9 @@ Tr_accessList Tr_formals(Tr_level level){
 	return makeFormalsT(fl, level);
 }
 
+Tr_exp Tr_err(){
+    return Tr_Ex(T_Const(0));
+}
 //transVar
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l){
 	Tr_level vl = acc->level;
@@ -241,16 +249,15 @@ Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l){
 	return Tr_Ex(F_exp(vacc, fp));
 }
 
-Tr_exp Tr_fieldVar(Tr_access acc, Tr_level l, int cnt){
-	Tr_exp e = Tr_simpleVar(acc, l);
-	T_exp base = unEx(e);
+Tr_exp Tr_fieldVar(Tr_exp base, int cnt){
+	T_exp b = unEx(base);
 	int offset = F_wordsize * cnt;
-	T_exp field = T_Mem(T_Binop(T_plus, T_Const(offset),base));
+	T_exp field = T_Mem(T_Binop(T_plus, T_Const(offset), b));
 	return Tr_Ex(field);
 }
 
-Tr_exp Tr_subscriptVar(Tr_access acc, Tr_level l, int off){
-	return Tr_fieldVar(acc,l,off);
+Tr_exp Tr_subscriptVar(Tr_exp base, int off){
+	return Tr_fieldVar(base,off);
 }
 
 //transExp
@@ -354,6 +361,7 @@ Tr_exp Tr_recordExp(Tr_expList list, int cnt){
     T_stm init = T_Move(base, F_externalCall("malloc", T_ExpList(T_Const(total),NULL)));
 
     T_exp finall = T_Eseq(T_Seq(init,fill), base); 
+    
     return Tr_Ex(finall);    
 }
 Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val){
@@ -388,14 +396,17 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
                     T_Seq(T_Label(t),
                         T_Seq(thenStm,
                             T_Seq(T_Label(f), elseStm))));
+    
     return Tr_Nx(s);
 }
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
     Temp_label start = Temp_newlabel();
     
     struct Cx testCx = unCx(test);
+    
     doPatch(testCx.trues,start);
     doPatch(testCx.falses,done);
+    
     T_stm testStm = testCx.stm;
 
     T_stm s = T_Seq(T_Label(start),
@@ -403,6 +414,7 @@ Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
                     T_Seq(unNx(body),
                         T_Seq(T_Jump(T_Name(start),Temp_LabelList(start,NULL)),
                             T_Label(done)))));
+    
     return Tr_Nx(s);
 }
 Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){

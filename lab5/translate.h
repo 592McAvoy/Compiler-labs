@@ -42,10 +42,12 @@ Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail);
 void Tr_procEntryExit1(Tr_level level, Tr_exp body, Tr_accessList formals);
 F_fragList Tr_getResult(void);
 
+Tr_exp Tr_err();
+
 //transVar
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l);
-Tr_exp Tr_fieldVar(Tr_access acc, Tr_level l, int cnt);
-Tr_exp Tr_subscriptVar(Tr_access acc, Tr_level l, int off);
+Tr_exp Tr_fieldVar(Tr_exp base,  int cnt);
+Tr_exp Tr_subscriptVar(Tr_exp base, int off);
 
 //transExp
 Tr_exp Tr_nilExp();

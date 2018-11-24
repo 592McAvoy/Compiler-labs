@@ -39,6 +39,10 @@ int recursive;
 
 /*helper functions in lab4*/
 Ty_tyList makeFormals(S_table tenv, A_fieldList list){
+	//empty params
+	if(!list){
+		return NULL;
+	}
 	A_field param = list->head;
 	S_symbol name = param->name; 
 	S_symbol typ = param->typ;
@@ -51,6 +55,10 @@ Ty_tyList makeFormals(S_table tenv, A_fieldList list){
 }
 
 U_boolList makeBoolList(A_fieldList list){
+	//empty params
+	if(!list){
+		return NULL;
+	}
 	A_field param = list->head;
 	if(!list->tail){
 		return U_BoolList(param->escape, NULL);
@@ -61,9 +69,13 @@ U_boolList makeBoolList(A_fieldList list){
 }
 
 void enterParams(S_table venv, S_table tenv, A_fieldList list, Tr_accessList accs){
+	//empty params
+	if(!list){
+		return;
+	}
 	A_fieldList params;
 	Tr_accessList acc;
-	for(params=list, acc=accs; params; params=params->tail, acc=acc->tail){
+	for(params=list, acc=accs->tail; params; params=params->tail, acc=acc->tail){
 		A_field param = params->head;
 		S_symbol name = param->name; 
 		S_symbol typ = param->typ;
@@ -176,22 +188,22 @@ int checkFuncRepeat(A_fundecList list, S_symbol name){
 
 /* core functions */
 F_fragList SEM_transProg(A_exp e){
-	printf("-1");
 	//TODO LAB5: do not forget to add the main frame
 	venv = E_base_venv();
 	tenv = E_base_tenv();
 	recursive = 0;
 
 	//Find escape
-	printf("0");
 	Esc_findEscape(e);
-	printf("1");
-	/*Temp_label prog = Temp_newlabel();
-	printf("2");
-	//transExp(venv, tenv, e, Tr_outermost(), prog);
-	printf("3");
-	return Tr_getResult(); */
-	return NULL;
+
+	Temp_label prog = Temp_newlabel();
+	Tr_level l = Tr_outermost();
+
+	struct expty body = transExp(venv, tenv, e, l, prog);
+
+	Tr_procEntryExit1(l, body.exp, NULL);
+	
+	return Tr_getResult(); 
 }
 
 
@@ -270,6 +282,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 			for(types= get_typedec_list(d);types;types=types->tail){
 				A_namety type = types->head;
 				S_symbol name = type->name; A_ty ty = type->ty;
+				//printf("ty: %s\n",S_name(name));
 				S_enter(tenv,name,Ty_Name(name, transTy(tenv,ty)));
 			}
 
@@ -288,12 +301,12 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 			S_symbol typ = get_vardec_typ(d);
 			A_exp init = get_vardec_init(d);
 			bool esc = get_vardec_esc(d);
-
+			//printf("\nvar: %s\n",S_name(var));
 			struct expty initty = transExp(venv, tenv, init, l, label);
-
+		
 			if(typ){
 				Ty_ty ty = S_look(tenv, typ);
-				if(typeEqual(ty, initty.ty) == 1){
+				if(typeEqual(ty, initty.ty) == 1 || initty.ty->kind == Ty_nil){
 					Tr_access acc = Tr_allocLocal(l, esc);
 					S_enter(venv, var, E_VarEntry(acc, ty));
 					return Tr_varDec(acc, initty.exp);
@@ -325,7 +338,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				A_fieldList params = func->params; 
 		 		S_symbol result = func->result; 
 				A_exp body = func->body;
-
+				
 				if(checkFuncRepeat(funcs, name) != 1){
 					EM_error(d->pos, "two functions have the same name");
 					return Tr_typeDec(); 
@@ -334,6 +347,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				Temp_label fname = Temp_newlabel();
 				Tr_level newl = Tr_newLevel(l, fname, makeBoolList(params));
 				Ty_tyList formals = makeFormals(tenv, params);
+				
 				if(result){
 					S_enter(venv, name, E_FunEntry(
 						newl,
@@ -356,9 +370,11 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				A_fieldList params = func->params; 
 		 		S_symbol result = func->result; 
 				A_exp body = func->body;
-				
-				Temp_label fname = Temp_newlabel();
-				Tr_level newl = Tr_newLevel(l, fname, makeBoolList(params));
+
+				//printf("func %s\n",S_name(name));	
+				E_enventry f = S_look(venv, name);		
+				Temp_label fname = f->u.fun.label;
+				Tr_level newl = f->u.fun.level;				
 				Ty_tyList formals = makeFormals(tenv, params);
 				if(result){
 					S_enter(venv, name, E_FunEntry(
@@ -375,12 +391,16 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				
 				S_beginScope(venv);
 				enterParams(venv, tenv, params, Tr_formals(newl));
+			
 				struct expty resultty = transExp(venv, tenv, body, newl, fname);
+				
 				S_endScope(venv);
 
 				if(result){
 					Ty_ty rty = S_look(tenv, result);
 					if(actualTy(rty)->kind == actualTy(resultty.ty)->kind){
+						Tr_exp proc = Tr_functionDec(fname, newl, resultty.exp);
+						Tr_procEntryExit1(newl, proc, Tr_formals(newl));
 						continue;
 					}
 					else{
@@ -390,6 +410,8 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				}
 				else{
 					if(actualTy(resultty.ty)->kind == Ty_void){
+						Tr_exp proc = Tr_functionDec(fname, newl, resultty.exp);
+						Tr_procEntryExit1(newl, proc, Tr_formals(newl));
 						continue;
 					}
 					else{
@@ -397,8 +419,6 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 						return Tr_typeDec(); 
 					}
 				}
-				Tr_exp proc = Tr_functionDec(fname, newl, resultty.exp);
-				Tr_procEntryExit1(newl, proc, Tr_formals(newl));
 
 			}			
 			return Tr_typeDec();
@@ -420,38 +440,37 @@ struct expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_labe
 				return expTy(Tr_simpleVar(get_varentry_access(x),l), get_varentry_type(x));
 			else  {
 				EM_error(v->pos, "undefined variable %s", S_name(simple));
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 		}
 		case A_fieldVar:{
 			A_var var = get_fieldvar_var(v); 
 			S_symbol sym = get_fieldvar_sym(v);
 
-			E_enventry x = S_look(venv, get_simplevar_sym(var));
-			if  ( x && x->kind == E_varEntry ) {
-				Ty_ty ty = get_varentry_type(x);
+			struct expty base = transVar(venv,tenv,var,l,label);
+			Ty_ty ty = base.ty;
+			if (ty){
 				if(actualTy(ty)->kind == Ty_record){
 					ty = actualTy(ty);
 					int cnt = 0;
 					for(Ty_fieldList record=ty->u.record;record;record=record->tail){
 						Ty_field field = record->head;
 						if(S_name(field->name) == S_name(sym)){
-							Tr_access acc = get_varentry_access(x);
-							return expTy(Tr_fieldVar(acc,l,cnt), field->ty);
+							return expTy(Tr_fieldVar(base.exp, cnt), field->ty);
 						}
 						cnt += 1;
 					}
 					EM_error(v->pos, "field %s doesn\'t exists", S_name(sym));
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 				else{
 					EM_error(var->pos, "not a record type", S_name(get_simplevar_sym(var)));
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 			}
 			else  {
 				EM_error(var->pos, "undefined variable %s", S_name(get_simplevar_sym(var)));
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 
 		}
@@ -459,33 +478,33 @@ struct expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_labe
 			A_var var = get_subvar_var(v);
 			A_exp ex = get_subvar_exp(v);
 
-			E_enventry x = S_look(venv, get_simplevar_sym(var));
-			if  ( x && x->kind == E_varEntry ) {
-				Ty_ty ty = get_varentry_type(x);
+			struct expty base = transVar(venv, tenv, var, l, label);
+			struct expty sub = transExp(venv, tenv, ex, l, label);
+			Ty_ty ty = base.ty;
+			if(ty){
 				if(actualTy(ty)->kind == Ty_array){
-					if(ex->kind != A_intExp){
+					if(actualTy(sub.ty)->kind != Ty_int){
 						EM_error(var->pos, "array subscirpt not int");
-						return expTy(NULL, Ty_Int());
+						return expTy(Tr_err(), Ty_Int());
 					}
 					ty = actualTy(ty);
-					Tr_access acc = get_varentry_access(x);
 					int off = ex->u.intt;
-					return expTy(Tr_subscriptVar(acc,l,off), ty->u.array);
+					return expTy(Tr_subscriptVar(base.exp, off), ty->u.array);
 				}
 				else{
 					EM_error(var->pos, "array type required");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 			}
 			else  {
 				EM_error(var->pos, "undefined variable %s", S_name(get_simplevar_sym(var)));
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 
 		}
 		default:{
 			EM_error(v->pos, "strange variable type %d", v->kind);
-			return expTy(NULL, Ty_Int());
+			return expTy(Tr_err(), Ty_Int());
 		}
 	}
 }
@@ -526,17 +545,17 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					
 					if(actualTy(pp.ty)->kind != actualTy(ty)->kind){
 						EM_error(param->pos, "para type mismatch");
-						return expTy(NULL, Ty_Int());
+						return expTy(Tr_err(), Ty_Int());
 					}
 					ls = Tr_ExpList(pp.exp, ls);
 				}
 				if(exps != NULL){
 					EM_error(a->pos, "too many params in function %s", S_name(func));
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 				if(tys != NULL){
 					EM_error(a->pos, "too less params in function %s", S_name(func));
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 				Temp_label fname =  get_func_label(x);
 				Tr_level flev =	get_func_level(x);
@@ -544,7 +563,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			}
 			else{
 				EM_error(a->pos, "undefined function %s", S_name(func));
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 		}
 	    case A_opExp:{
@@ -561,18 +580,18 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				{
 					if(actualTy(le.ty)->kind != Ty_int){
 						EM_error(get_opexp_leftpos(a), "integer required");
-						return expTy(NULL, Ty_Int());
+						return expTy(Tr_err(), Ty_Int());
 					}
 					if(actualTy(r.ty)->kind != Ty_int){
 						EM_error(get_opexp_rightpos(a), "integer required");
-						return expTy(NULL, Ty_Int());
+						return expTy(Tr_err(), Ty_Int());
 					}					
 					return expTy(Tr_arithExp(oper,le.exp,r.exp), Ty_Int());
 				}
 				//compare
 				default:
 				{
-					if(actualTy(le.ty)->kind == actualTy(r.ty)->kind){
+					if(actualTy(le.ty)->kind == actualTy(r.ty)->kind || le.ty->kind == Ty_nil || r.ty->kind == Ty_nil){
 						if(actualTy(le.ty)->kind == Ty_record || actualTy(le.ty)->kind == Ty_array){
 							return expTy(Tr_ptrCompExp(oper,le.exp,r.exp), Ty_Int());
 						}
@@ -585,7 +604,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					} 					
 					else{
 						EM_error(get_opexp_leftpos(a), "same type required");
-						return expTy(NULL, Ty_Int());
+						return expTy(Tr_err(), Ty_Int());
 					}
 
 				}
@@ -609,12 +628,13 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					
 					A_efield f = fs->head;
 					S_symbol fname = f->name; A_exp fexp = f->exp;
-					//printf("%s %s\n",S_name(rname), S_name(fname));
+					
 					struct expty ety = transExp(venv, tenv, fexp, l, label);
 
-					if(!(rname == fname && actualTy(rty)->kind == actualTy(ety.ty)->kind)){
+					//if(!(rname == fname && actualTy(rty)->kind == actualTy(ety.ty)->kind)){
+					if(!(rname == fname && typeEqual(rty, ety.ty)) && ety.ty->kind != Ty_nil){
 						EM_error(fexp->pos, "unmatch type of field %s", S_name(rname));
-						return expTy(NULL, Ty_Int());
+						return expTy(Tr_err(), Ty_Int());
 					}
 
 					cnt += 1;
@@ -622,18 +642,23 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				}
 				if(record != NULL || fs != NULL){
 					EM_error(a->pos, "unmatch amount of fields");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 				return expTy(Tr_recordExp(el, cnt), type);
 			}
 			else{
 				EM_error(a->pos, "undefined type %s", S_name(typ));
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 		}
 		case A_seqExp:{
 			A_expList seq;
 			struct expty ety;
+			if(!get_seqexp_seq(a)){
+				//empty exp:()
+				ety.exp = Tr_nilExp();
+				ety.ty = Ty_Void();
+			}
 			for(seq=get_seqexp_seq(a); seq; seq=seq->tail){
 				A_exp ex = seq->head;
 				ety = transExp(venv, tenv, ex, l, label);
@@ -641,6 +666,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			return ety;
 		}
 		case A_assignExp:{
+			
 			A_var var = get_assexp_var(a); 
 			A_exp ex = get_assexp_exp(a);
 
@@ -648,22 +674,23 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				E_enventry x = S_look(venv, get_simplevar_sym(var));
 				if(x->readonly == 1){
 					EM_error(a->pos, "loop variable modified");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 			}
 			
 			struct expty vty = transVar(venv, tenv, var, l, label);
 			struct expty ety = transExp(venv, tenv, ex, l, label);
 
-			if(typeEqual(vty.ty, ety.ty) == 1){
+			if(typeEqual(vty.ty, ety.ty) == 1 || ety.ty->kind == Ty_nil){
 				return expTy(Tr_assignExp(vty.exp, ety.exp), Ty_Void());
 			}
 			else{
 				EM_error(a->pos, "unmatched assign exp");
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 		} 
 		case A_ifExp:{
+			//pr_exp(stderr, a, 0);
 			A_exp test = get_ifexp_test(a); 
 			A_exp then = get_ifexp_then(a);
 			A_exp elsee = get_ifexp_else(a);
@@ -674,11 +701,11 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 
 			if(actualTy(elsety.ty)->kind == Ty_nil){
 				if(actualTy(thenty.ty)->kind == Ty_void){
-					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), elsety.ty);
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), thenty.ty);
 				}
 				else{
-					EM_error(a->pos, "if-then exp's body must produce no value");
-					return expTy(NULL, Ty_Int());
+					//EM_error(a->pos, "if-then exp's body must produce no value");
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), thenty.ty);
 				}
 			}
 			else{
@@ -687,7 +714,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				}
 				else{
 					EM_error(a->pos, "then exp and else exp type mismatch");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 			}
 		}
@@ -697,7 +724,9 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 
 			Temp_label done = Temp_newlabel();
 			struct expty testty = transExp(venv, tenv, test, l, label);
+			//printf("while test\n");
 			struct expty bodyty = transExp(venv, tenv, body, l, done);
+			//printf("while body\n");
 
 			//Ty_print(bodyty.ty);
 
@@ -706,7 +735,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			}
 			else{
 				EM_error(body->pos, "while body must produce no value");
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 
 		}
@@ -732,12 +761,12 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				}
 				else{
 					EM_error(body->pos, "forbody must produce no value");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 			}
 			else{
 				EM_error(a->pos, "for exp's range type is not integer\nloop variable can't be assigned");
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 			
 		}
@@ -748,11 +777,13 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			A_decList decs; 
 			A_exp body = get_letexp_body(a);
 
+			
 			S_beginScope(tenv); S_beginScope(venv);
 			for(decs=get_letexp_decs(a); decs; decs=decs->tail){
 				A_dec dec = decs->head;
 				transDec(venv, tenv, dec, l, label);
 			}
+			//printf("dec over\n");
 			struct expty bodyty = transExp(venv, tenv, body, l, label);
 			S_endScope(venv); S_endScope(tenv);
 
@@ -771,23 +802,24 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				struct expty initty = transExp(venv, tenv, init, l, label);
 				if(sizety.ty->kind != Ty_int){
 					EM_error(a->pos, "array size type not integer");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
-				if(initty.ty->kind != get_array_kind(typp)){
+				//if(initty.ty->kind != get_array_kind(typp)){
+				if(typeEqual(initty.ty, typp->u.array)==0){
 					EM_error(a->pos, "type mismatch");
-					return expTy(NULL, Ty_Int());
+					return expTy(Tr_err(), Ty_Int());
 				}
 				int len = size->u.intt;
 				return expTy(Tr_arrayExp(len, initty.exp), type);
 			}
 			else{
 				EM_error(a->pos, "undefined type %s", S_name(typ));
-				return expTy(NULL, Ty_Int());
+				return expTy(Tr_err(), Ty_Int());
 			}
 		}
 		default:{
 			EM_error(a->pos, "strange exp type %d", a->kind);
-			return expTy(NULL, Ty_Int());
+			return expTy(Tr_err(), Ty_Int());
 		}
 	}
 }

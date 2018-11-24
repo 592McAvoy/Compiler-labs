@@ -7,6 +7,7 @@
 #include "frame.h"
 #include "translate.h"
 #include "escape.h"
+#include "prabsyn.h"
 
 struct expty;
 

@@ -89,9 +89,12 @@ traverseExp(S_table table, int depth, A_exp a){
 			A_exp hi = get_forexp_hi(a);
 			A_exp body = get_forexp_body(a);
 
+			traverseExp(table, depth, lo);
+			traverseExp(table, depth, hi);
+
 			S_beginScope(table);
-			S_enter(table, var, &(a->u.forr.escape));
 			a->u.forr.escape = 0;
+			S_enter(table, var, EscapeEntry(depth,&(a->u.forr.escape)));
 			traverseExp(table, depth, body);
 			S_endScope(table);
 
@@ -108,6 +111,7 @@ traverseExp(S_table table, int depth, A_exp a){
 			for(A_decList decs=get_letexp_decs(a); decs; decs=decs->tail){
 				A_dec dec = decs->head;
 				traverseDec(table, depth, dec);
+				
 			}
 			traverseExp(table, depth, body);
 			S_endScope(table);
@@ -154,10 +158,11 @@ traverseDec(S_table table, int depth, A_dec d){
 		}		
 		case A_varDec:{
 			S_symbol var = get_vardec_var(d);
-			
-			S_enter(table, var, EscapeEntry(depth, &(d->u.var.escape)));
+			A_exp init = get_vardec_init(d);
+			//printf("dec %s\n",S_name(var));
 			d->u.var.escape = 0;
-			
+			S_enter(table, var, EscapeEntry(depth, &(d->u.var.escape)));			
+			traverseExp(table, depth, init);
 			return;
 		}		
 		default:{
@@ -172,10 +177,10 @@ traverseVar(S_table table, int depth, A_var v){
 	switch(v->kind){
 		case A_simpleVar:{
 			S_symbol simple = get_simplevar_sym(v);
-
+			//printf("var %s\n",S_name(simple));
 			escapeEntry esc = S_look(table, simple);
 			if(esc && depth > esc->depth){
-				*(esc->escape) = 1;
+				*esc->escape = 1;
 			}
 			return;
 		}
@@ -185,7 +190,10 @@ traverseVar(S_table table, int depth, A_var v){
 		}
 		case A_subscriptVar:{
 			A_var var = get_subvar_var(v);
-			return traverseVar(table, depth, var);
+			A_exp ex = get_subvar_exp(v);
+			traverseVar(table, depth, var);
+			traverseExp(table, depth, ex);
+			return;
 		}
 		default:{
 			EM_error(v->pos, "strange variable type %d", v->kind);
