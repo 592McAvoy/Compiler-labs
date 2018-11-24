@@ -58,6 +58,7 @@ S_table E_base_tenv(void)
 	S_enter(table, ty_string, Ty_String());	
 
 	return table;
+	
 }
 
 S_table E_base_venv(void)
@@ -115,7 +116,6 @@ S_table E_base_venv(void)
 	formals->tail->tail = checked_malloc(sizeof(*formals));
 	formals->tail->tail->head = Ty_Int();
 	S_enter(venv,S_Symbol("substring"),E_FunEntry(level,label,formals,result));
-
 
 	return venv;
 }

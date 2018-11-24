@@ -5,6 +5,7 @@
 
 #include "absyn.h"
 #include "symbol.h"
+#include "helper.h"
 
 typedef struct escapeEntry_ *escapeEntry;
 struct escapeEntry_ {

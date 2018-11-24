@@ -125,7 +125,7 @@ traverseExp(S_table table, int depth, A_exp a){
 		}
 		default:{
 			EM_error(a->pos, "strange exp type %d", a->kind);
-			return expTy(NULL, Ty_Int());
+			return;
 		}
 	}
 }
@@ -189,7 +189,7 @@ traverseVar(S_table table, int depth, A_var v){
 		}
 		default:{
 			EM_error(v->pos, "strange variable type %d", v->kind);
-			return expTy(NULL, Ty_Int());
+			return;
 		}
 	}
 }

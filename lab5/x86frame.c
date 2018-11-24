@@ -42,7 +42,7 @@ struct F_access_ {
 };
 
 /* functions */
-static F_access Inframe(int offset){
+static F_access InFrame(int offset){
 	F_access ac = checked_malloc(sizeof(*ac));
 
 	ac->kind = inFrame;
@@ -67,7 +67,10 @@ F_accessList F_AccessList(F_access head, F_accessList tail){
 }
 
 // param position wait to be reset
-F_accessList makeFormals(U_boolList formals, int* cntp){
+F_accessList makeFormalsF(U_boolList formals, int* cntp){
+	if(!formals){
+		return NULL;
+	}
 	bool esc = formals->head;
 	int cnt = *cntp;
 	*cntp = cnt+1;
@@ -81,7 +84,7 @@ F_accessList makeFormals(U_boolList formals, int* cntp){
 	}
 	
 	if(formals->tail){
-		return F_AccessList(ac, makeFormals(formals->tail, cntp));
+		return F_AccessList(ac, makeFormalsF(formals->tail, cntp));
 	}
 	else{
 		return F_AccessList(ac, NULL);
@@ -94,7 +97,7 @@ F_frame F_newFrame(Temp_label name, U_boolList formals){
 	*argsize = 0;
 	
 	f->name = name;
-	f->formals = makeFormals(formals, argsize);
+	f->formals = makeFormalsF(formals, argsize);
 	f->locals = NULL;
 	f->argSize = *argsize;
 	f->length = 0;
@@ -136,6 +139,15 @@ F_accessList F_formals(F_frame f){
 Temp_temp F_FP(void){
 	return Temp_newtemp();
 }
+Temp_temp F_SP(void){
+	return Temp_newtemp();
+}
+Temp_temp F_RV(void){
+	return Temp_newtemp();
+}
+Temp_temp F_PC(void){
+	return Temp_newtemp();
+}
 
 T_exp F_exp(F_access acc, T_exp framePtr){
 	if(acc->kind == inFrame){
@@ -148,20 +160,39 @@ T_exp F_exp(F_access acc, T_exp framePtr){
 }
 
 T_exp F_externalCall(string s, T_expList args){
-	return T_Call(T_Name(Temp_namedlabel(s), args);
+	return T_Call(T_Name(Temp_namedlabel(s)), args);
 }
 
+T_stm F_procEntryExit1(F_frame f, T_stm stm){//4, 5, 8
+	return stm;
+}
+T_stm F_procEntryExit3(F_frame f, T_stm stm){//1, 3, 9, 11
+	return stm;
+}
 
 /* fragment */
-F_frag F_StringFrag(Temp_label label, string str) {   
-	    return NULL;                                      
+F_frag F_StringFrag(Temp_label label, string str) { 
+	F_frag f = checked_malloc(sizeof(*f));
+	f->kind = F_stringFrag;
+	f->u.stringg.label = label;
+	f->u.stringg.str = str;
+
+	return f;                                      
 }                                                     
                                                       
 F_frag F_ProcFrag(T_stm body, F_frame frame) {        
-	    return NULL;                                      
+	F_frag f = checked_malloc(sizeof(*f));
+	f->kind = F_procFrag;
+	f->u.proc.body = body;
+	f->u.proc.frame = frame;
+
+	return f;                                     
 }                                                     
                                                       
 F_fragList F_FragList(F_frag head, F_fragList tail) { 
-	    return NULL;                                      
+	F_fragList l = checked_malloc(sizeof(*l));
+	l->head = head;
+	l->tail = tail;
+	return l;                                      
 }                                                     
 

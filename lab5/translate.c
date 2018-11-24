@@ -11,15 +11,11 @@
 
 //LAB5: you can modify anything you want.
 
+F_fragList frags = NULL;
+
 struct Tr_access_ {
 	Tr_level level;
 	F_access access;
-};
-
-
-struct Tr_accessList_ {
-	Tr_access head;
-	Tr_accessList tail;	
 };
 
 struct Tr_level_ {
@@ -28,10 +24,7 @@ struct Tr_level_ {
 };
 
 /* Tr_expList*/
-struct Tr_expList_{
-	Tr_exp head;
-	Tr_expList tail;
-};
+
 Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail){
 	Tr_expList l = checked_malloc(sizeof(*l));
 
@@ -213,14 +206,14 @@ Tr_accessList Tr_AccessList(Tr_access head, Tr_accessList tail){
 	return list;
 }
 
-Tr_accessList makeFormals(F_accessList fl, Tr_level level){
+Tr_accessList makeFormalsT(F_accessList fl, Tr_level level){
 	Tr_access ac = checked_malloc(sizeof(*ac));
 
 	ac->level = level;
 	ac->access = fl->head;
 
 	if(fl->tail){
-		return Tr_AccessList(ac, makeFormals(fl->tail, level));
+		return Tr_AccessList(ac, makeFormalsT(fl->tail, level));
 	}
 	else{
 		return Tr_AccessList(ac, NULL);
@@ -230,7 +223,7 @@ Tr_accessList makeFormals(F_accessList fl, Tr_level level){
 Tr_accessList Tr_formals(Tr_level level){
 	F_frame f = level->frame;
 	F_accessList fl = F_formals(f);
-	return makeFormals(fl, level);
+	return makeFormalsT(fl, level);
 }
 
 //transVar
@@ -270,14 +263,14 @@ Tr_exp Tr_intExp(int i){
 Tr_exp Tr_stringExp(string str){
     Temp_label lab = Temp_newlabel();
     F_frag strf = F_StringFrag(lab, str);
-    //add strf to global frag table
+    frags = F_FragList(strf, frags);
     return Tr_Ex(T_Name(lab));
 }
 Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl){
     T_expList args = NULL;
     for(Tr_expList l=params; l; l=l->tail){
         Tr_exp param = l->head;
-        args = T_ExpList(param, args);
+        args = T_ExpList(unEx(param), args);
     }
 
     //calculate SL
@@ -290,7 +283,7 @@ Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level env
 	}
     args = T_ExpList(fp, args);
 
-    return Tr_Ex(T_Call(T_NAME(fname), args));
+    return Tr_Ex(T_Call(T_Name(fname), args));
 }
 Tr_exp Tr_arithExp(A_oper op, Tr_exp left, Tr_exp right){
     T_binOp bop;
@@ -325,12 +318,12 @@ Tr_exp Tr_strCompExp(A_oper op, Tr_exp left, Tr_exp right){
         case A_ltOp:
         case A_leOp:
         case A_gtOp:
-        case A_geOp:return Tr_intCompExp(op, left, right)
+        case A_geOp:return Tr_intCompExp(op, left, right);
         case A_eqOp:rop=T_eq;break;
         case A_neqOp:rop=T_ne;break;
     }
-    T_exp func = F_externalCall("stringEqual", T_ExpList(unEx(left),T_ExpList(unEx(right))));
-    T_stm s T_Cjump(rop, func, T_Const(1), NULL, NULL);
+    T_exp func = F_externalCall("stringEqual", T_ExpList(unEx(left),T_ExpList(unEx(right),NULL)));
+    T_stm s = T_Cjump(rop, func, T_Const(1), NULL, NULL);
     patchList trues = PatchList(&(s->u.CJUMP.true),NULL);
     patchList falses = PatchList(&(s->u.CJUMP.false),NULL);
     return Tr_Cx(trues,falses,s);  
@@ -343,7 +336,9 @@ Tr_exp Tr_recordExp(Tr_expList list, int cnt){
     T_exp base = T_Temp(r);
 
     T_stm fill;
-    for(int i=1,Tr_expList lp=list; i<=cnt; i++, lp=lp->tail){
+    Tr_expList lp;
+    int i;
+    for(i=1,lp=list; i<=cnt; i++, lp=lp->tail){
         Tr_exp e = lp->head;
         int off = (cnt-i) * F_wordsize;
         
@@ -352,7 +347,7 @@ Tr_exp Tr_recordExp(Tr_expList list, int cnt){
         if(i == 1)
             fill = move;
         else
-            fill = T_Seq(move, s);
+            fill = T_Seq(move, fill);
     }
 
     int total = cnt * F_wordsize;
@@ -392,7 +387,7 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
     T_stm s = T_Seq(testStm,
                     T_Seq(T_Label(t),
                         T_Seq(thenStm,
-                            T_Seq(T_label(f), elseStm))));
+                            T_Seq(T_Label(f), elseStm))));
     return Tr_Nx(s);
 }
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
@@ -405,9 +400,9 @@ Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
 
     T_stm s = T_Seq(T_Label(start),
                 T_Seq(testStm,
-                    T_Seq(unNx(body,
+                    T_Seq(unNx(body),
                         T_Seq(T_Jump(T_Name(start),Temp_LabelList(start,NULL)),
-                            T_Label(done))))));
+                            T_Label(done)))));
     return Tr_Nx(s);
 }
 Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){
@@ -419,24 +414,24 @@ Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){
     Temp_label pass = Temp_newlabel();
 
     T_stm init = T_Move(i,low);
-    T_stm test = T_Cjump(T_le, i, high, T_Name(loop), T_Name(done));
-    T_stm update = T_Binop(T_plus, i, T_Const(1));
+    T_stm test = T_Cjump(T_le, i, high, loop, done);
+    T_stm update = T_Exp(T_Binop(T_plus, i, T_Const(1)));
     T_stm bodyy = unNx(body);
 
     T_stm s = T_Seq(init,
-                T_Seq(T_Cjump(T_le, i, high, T_Name(pass),T_Name(done)),
+                T_Seq(T_Cjump(T_le, i, high, pass, done),
                     T_Seq(T_Label(pass),
-                        T_Seq(boddy,
-                            T_Seq(T_Cjump(T_ne, i, high, T_Name(loop), T_Name(done)),
+                        T_Seq(bodyy,
+                            T_Seq(T_Cjump(T_ne, i, high, loop, done),
                                 T_Seq(T_Label(loop),
                                     T_Seq(update,
-                                        T_Seq(boddy, 
+                                        T_Seq(bodyy, 
                                             T_Seq(test, T_Label(done))))))))));
     return Tr_Nx(s);
 
 }
 Tr_exp Tr_breakExp(Temp_label done){
-    return Tr_nx(T_Jump(T_Name(done),Temp_LabelList(done,NULL)));
+    return Tr_Nx(T_Jump(T_Name(done),Temp_LabelList(done,NULL)));
 }
 Tr_exp Tr_arrayExp(int size, Tr_exp initvar){
     Temp_temp r = Temp_newtemp();
@@ -448,3 +443,61 @@ Tr_exp Tr_arrayExp(int size, Tr_exp initvar){
     T_exp finall = T_Eseq(init, base); 
     return Tr_Ex(finall);   
 } 
+
+//transDec
+Tr_exp Tr_typeDec(){
+    return Tr_Ex(T_Const(0));
+}
+Tr_exp Tr_varDec(Tr_access acc, Tr_exp init){
+    T_exp pos = unEx(Tr_simpleVar(acc, acc->level));
+    return Tr_Nx(T_Move(pos, unEx(init)));
+}
+//wait to be re-design
+Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody){
+    T_exp SP = T_Temp(F_SP());
+    T_exp FP = T_Temp(F_FP());
+    T_exp PC = T_Temp(F_PC());
+    T_exp RV = T_Temp(F_RV());
+    //Prologue
+    //1.Pseudo-instructions to announce the beginning of a function;
+    //2.A label definition of the function name
+    T_stm s1 = T_Label(fname);
+    //3.adjust FP,SP
+    T_exp updateSP = T_Binop(T_minus, T_Const(F_wordsize), SP);
+    T_stm agjust = T_Seq(T_Exp(updateSP),
+                        T_Seq(T_Move(T_Mem(SP),FP),//static link
+                            T_Seq(T_Exp(updateSP),
+                                T_Seq(T_Move(T_Mem(SP),T_Binop(T_plus, T_Const(1), PC)),//return addr
+                                    T_Seq(T_Move(FP, SP),//new frame
+                                    T_Move(PC, T_Name(fname)))))));//move PC
+    //adjust SP
+    //4.enter params    
+    //5.Store instructions to save any callee-saved registers
+    //6.The function body
+    //Epilogue
+    //7.An instruction to move the return value to RA register
+    T_stm moveRet = T_Move(RV, unEx(fbody));
+    //8.Load instructions to restore the callee-save registers
+    //9.An instruction to reset the stack pointer (to deallocate the frame)
+    //10.A return instruction (Jump to the return address)
+    T_stm ret = T_Seq(T_Move(PC, T_Mem(FP)),//restore PC
+                    T_Seq(T_Move(SP, T_Mem(T_Binop(T_plus,T_Const(2*F_wordsize),FP))),//restore SP
+                    T_Move(FP, T_Mem(T_Binop(T_plus,T_Const(F_wordsize),FP)))));//restore FP
+    //11.Pseduo-instructions, as needed, to announce the end of a function
+
+    return Tr_Ex(T_Const(0));
+}
+
+void Tr_procEntryExit1(Tr_level level, Tr_exp body, Tr_accessList formals){
+	F_frame f = level->frame;
+	//fill holes
+	T_stm s = F_procEntryExit1(f, unNx(body));
+	s = F_procEntryExit3(f, s);
+	
+	F_frag proc = F_ProcFrag(s, level->frame);
+	frags = F_FragList(proc, frags);
+}
+
+F_fragList Tr_getResult(void){
+	return frags;
+}

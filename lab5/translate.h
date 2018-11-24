@@ -13,6 +13,11 @@ typedef struct Tr_exp_ *Tr_exp;
 typedef struct Tr_access_ *Tr_access;
 
 typedef struct Tr_accessList_ *Tr_accessList;
+struct Tr_accessList_{
+	Tr_access head;
+	Tr_accessList tail;	
+};
+
 
 typedef struct Tr_level_ *Tr_level;
 
@@ -27,23 +32,15 @@ Tr_accessList Tr_formals(Tr_level level);
 Tr_access Tr_allocLocal(Tr_level level, bool escape);
 
 typedef struct Tr_expList_ *Tr_expList;
+struct Tr_expList_{
+	Tr_exp head;
+	Tr_expList tail;
+};
 Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail);
-/* IR translation 
-struct Tr_access_ {
-	Tr_level level;
-	F_access access;
-};
 
-
-struct Tr_accessList_ {
-	Tr_access head;
-	Tr_accessList tail;	
-};
-
-struct Tr_level_ {
-	F_frame frame;
-	Tr_level parent;
-};*/
+/* IR translation */
+void Tr_procEntryExit1(Tr_level level, Tr_exp body, Tr_accessList formals);
+F_fragList Tr_getResult(void);
 
 //transVar
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l);
@@ -68,13 +65,8 @@ Tr_exp Tr_breakExp(Temp_label done);
 Tr_exp Tr_arrayExp(int size, Tr_exp initvar);
 
 //transDec
-Tr_exp Tr_typeDec(){
-    return Tr_Ex(T_Const(0));
-}
-Tr_exp Tr_varDec(Tr_access acc, Tr_exp init){
-    T_exp pos = unEx(Tr_simpleVar(acc, acc->level));
-    return Tr_Nx(T_Move(pos, unEx(init)));
-}
-Tr_exp Tr_functionDec;
+Tr_exp Tr_typeDec();
+Tr_exp Tr_varDec(Tr_access acc, Tr_exp init);
+Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody);
 
 #endif

@@ -10,7 +10,7 @@
 #include "semant.h"
 #include "helper.h"
 #include "translate.h"
-#include "eacape.h"
+#include "escape.h"
 
 /*Lab5: Your implementation of lab5.*/
 
@@ -60,16 +60,14 @@ U_boolList makeBoolList(A_fieldList list){
 	}
 }
 
-//params alloc wait to be reset
-void enterParams(S_table venv, S_table tenv, A_fieldList list, Tr_level level){
+void enterParams(S_table venv, S_table tenv, A_fieldList list, Tr_accessList accs){
 	A_fieldList params;
-	for(params=list; params; params=params->tail){
+	Tr_accessList acc;
+	for(params=list, acc=accs; params; params=params->tail, acc=acc->tail){
 		A_field param = params->head;
 		S_symbol name = param->name; 
 		S_symbol typ = param->typ;
-		S_enter(venv, name, E_VarEntry(
-			Tr_allocLocal(level, param->escape),
-			S_look(tenv, typ)));
+		S_enter(venv, name, E_VarEntry(acc->head,S_look(tenv, typ)));
 	}
 	return;
 }
@@ -177,19 +175,22 @@ int checkFuncRepeat(A_fundecList list, S_symbol name){
 
 
 /* core functions */
-F_fragList SEM_transProg(A_exp exp){
-
+F_fragList SEM_transProg(A_exp e){
+	printf("-1");
 	//TODO LAB5: do not forget to add the main frame
 	venv = E_base_venv();
 	tenv = E_base_tenv();
 	recursive = 0;
 
 	//Find escape
-	Esc_findEscape(exp);
-	
-	Temp_label prog = Temp_newlabel();
-	transExp(venv, tenv, exp, Tr_outermost(), prog);
-
+	printf("0");
+	Esc_findEscape(e);
+	printf("1");
+	/*Temp_label prog = Temp_newlabel();
+	printf("2");
+	//transExp(venv, tenv, e, Tr_outermost(), prog);
+	printf("3");
+	return Tr_getResult(); */
 	return NULL;
 }
 
@@ -327,7 +328,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 
 				if(checkFuncRepeat(funcs, name) != 1){
 					EM_error(d->pos, "two functions have the same name");
-					return; 
+					return Tr_typeDec(); 
 				}
 
 				Temp_label fname = Temp_newlabel();
@@ -373,7 +374,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				}
 				
 				S_beginScope(venv);
-				enterParams(venv, tenv, params, l);
+				enterParams(venv, tenv, params, Tr_formals(newl));
 				struct expty resultty = transExp(venv, tenv, body, newl, fname);
 				S_endScope(venv);
 
@@ -384,6 +385,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 					}
 					else{
 						EM_error(d->pos, "false return type");
+						return Tr_typeDec(); 
 					}
 				}
 				else{
@@ -392,15 +394,18 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 					}
 					else{
 						EM_error(d->pos, "procedure returns value");
+						return Tr_typeDec(); 
 					}
 				}
+				Tr_exp proc = Tr_functionDec(fname, newl, resultty.exp);
+				Tr_procEntryExit1(newl, proc, Tr_formals(newl));
 
-			}
-			return;
+			}			
+			return Tr_typeDec();
 		}
 		default:{
 			EM_error(d->pos, "strange Dec type %d", d->kind);
-			return;
+			return Tr_typeDec();
 		}
 	}
 }
@@ -547,14 +552,14 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			A_exp left = get_opexp_left(a); 
 			A_exp right = get_opexp_right(a);
 
-			struct expty l = transExp(venv, tenv, left, l, label);
+			struct expty le = transExp(venv, tenv, left, l, label);
 			struct expty r = transExp(venv, tenv, right, l, label);
 
 			switch(oper){
 				//arithmetic calculation
 				case A_plusOp:case A_minusOp:case A_timesOp:case A_divideOp:
 				{
-					if(actualTy(l.ty)->kind != Ty_int){
+					if(actualTy(le.ty)->kind != Ty_int){
 						EM_error(get_opexp_leftpos(a), "integer required");
 						return expTy(NULL, Ty_Int());
 					}
@@ -562,20 +567,20 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 						EM_error(get_opexp_rightpos(a), "integer required");
 						return expTy(NULL, Ty_Int());
 					}					
-					return expTy(Tr_arithExp(oper,l.exp,r.exp), Ty_Int());
+					return expTy(Tr_arithExp(oper,le.exp,r.exp), Ty_Int());
 				}
 				//compare
 				default:
 				{
-					if(actualTy(l.ty)->kind == actualTy(r.ty)->kind){
-						if(actualTy(l.ty)->kind == Ty_record || actualTy(l.ty)->kind == Ty_array){
-							return expTy(Tr_ptrCompExp(oper,l.exp,r.exp), Ty_Int());
+					if(actualTy(le.ty)->kind == actualTy(r.ty)->kind){
+						if(actualTy(le.ty)->kind == Ty_record || actualTy(le.ty)->kind == Ty_array){
+							return expTy(Tr_ptrCompExp(oper,le.exp,r.exp), Ty_Int());
 						}
-						if(actualTy(l.ty)->kind == Ty_string){
-							return expTy(Tr_strCompExp(oper,l.exp,r.exp), Ty_Int());
+						if(actualTy(le.ty)->kind == Ty_string){
+							return expTy(Tr_strCompExp(oper,le.exp,r.exp), Ty_Int());
 						}
-						if(actualTy(l.ty)->kind == Ty_int){
-							return expTy(Tr_intCompExp(oper,l.exp,r.exp), Ty_Int());
+						if(actualTy(le.ty)->kind == Ty_int){
+							return expTy(Tr_intCompExp(oper,le.exp,r.exp), Ty_Int());
 						}
 					} 					
 					else{

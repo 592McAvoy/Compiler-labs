@@ -1,5 +1,5 @@
-a.out: parse.o prabsyn.o y.tab.o lex.yy.o errormsg.o util.o table.o absyn.o symbol.o semant.o types.o env.o tree.o temp.o printtree.o frame.o translate.o
-	gcc -g parse.o prabsyn.o y.tab.o lex.yy.o errormsg.o util.o table.o absyn.o symbol.o semant.o types.o env.o tree.o temp.o printtree.o frame.o translate.o
+a.out: parse.o prabsyn.o y.tab.o lex.yy.o errormsg.o util.o table.o absyn.o symbol.o escape.o semant.o types.o env.o tree.o temp.o printtree.o frame.o translate.o
+	gcc -g parse.o prabsyn.o y.tab.o lex.yy.o errormsg.o util.o table.o absyn.o symbol.o escape.o semant.o types.o env.o tree.o temp.o printtree.o frame.o translate.o
 
 parse.o: parse.c errormsg.h util.h
 	gcc -g -c parse.c
@@ -21,6 +21,10 @@ printtree.o: printtree.c printtree.h
 
 prabsyn.o: prabsyn.c prabsyn.h
 	gcc -g -c prabsyn.c
+
+escape.o: escape.c escape.h
+	gcc -g -c escape.c
+
 semant.o: semant.c semant.h
 	gcc -g -c semant.c
 env.o: env.c env.h

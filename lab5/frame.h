@@ -20,19 +20,17 @@ Temp_label F_name(F_frame f);
 F_accessList F_formals(F_frame f);
 F_access F_allocLocal(F_frame f, bool escape);
 
-/* declaration for IR translation 
-struct F_access_ {
-	enum {inFrame, inReg} kind;
-	union {
-		int offset; //inFrame
-		Temp_temp reg; //inReg
-	} u;
-};*/
-Temp_temp F_FP(void);
+/* declaration for IR translation */
+Temp_temp F_FP(void);//frame ptr
+Temp_temp F_SP(void);//stack ptr
+Temp_temp F_RV(void);//return value
+Temp_temp F_PC(void);//program counter
+
 extern const int F_wordsize;
 T_exp F_exp(F_access acc, T_exp framePtr);
 T_exp F_externalCall(string s, T_expList args);
-
+T_stm F_procEntryExit1(F_frame f, T_stm stm);
+T_stm F_procEntryExit3(F_frame f, T_stm stm);
 
 /* declaration for fragments */
 typedef struct F_frag_ *F_frag;
