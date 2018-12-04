@@ -5,6 +5,7 @@
 #include "absyn.h"
 #include "temp.h"
 #include "frame.h"
+#include "printtree.h"
 
 /* Lab5: your code below */
 
@@ -39,7 +40,7 @@ struct Tr_expList_{
 Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail);
 
 /* IR translation */
-void Tr_procEntryExit1(Tr_level level, Tr_exp body, Tr_accessList formals);
+void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals);
 F_fragList Tr_getResult(void);
 
 Tr_exp Tr_err();
@@ -47,7 +48,7 @@ Tr_exp Tr_err();
 //transVar
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l);
 Tr_exp Tr_fieldVar(Tr_exp base,  int cnt);
-Tr_exp Tr_subscriptVar(Tr_exp base, int off);
+Tr_exp Tr_subscriptVar(Tr_exp base, Tr_exp off);
 
 //transExp
 Tr_exp Tr_nilExp();
@@ -59,11 +60,13 @@ Tr_exp Tr_intCompExp(A_oper op, Tr_exp left, Tr_exp right);
 Tr_exp Tr_strCompExp(A_oper op, Tr_exp left, Tr_exp right);
 Tr_exp Tr_ptrCompExp(A_oper op, Tr_exp left, Tr_exp right);
 Tr_exp Tr_recordExp(Tr_expList list, int cnt);
+Tr_exp Tr_SeqExp(Tr_expList list);
 Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val);
 Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee);
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done);
-Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done);
+Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done);
 Tr_exp Tr_breakExp(Temp_label done);
+Tr_exp Tr_letExp(Tr_expList dec, Tr_exp body);
 Tr_exp Tr_arrayExp(int size, Tr_exp initvar);
 
 //transDec
@@ -71,4 +74,6 @@ Tr_exp Tr_typeDec();
 Tr_exp Tr_varDec(Tr_access acc, Tr_exp init);
 Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody);
 
+//print
+void Tr_print(Tr_exp e);
 #endif

@@ -11,6 +11,7 @@
 #include "helper.h"
 #include "translate.h"
 #include "escape.h"
+#include "printtree.h"
 
 /*Lab5: Your implementation of lab5.*/
 
@@ -200,8 +201,10 @@ F_fragList SEM_transProg(A_exp e){
 	Tr_level l = Tr_outermost();
 
 	struct expty body = transExp(venv, tenv, e, l, prog);
+	
+	//Tr_print(body.exp);
 
-	Tr_procEntryExit1(l, body.exp, NULL);
+	Tr_procEntryExit(l, body.exp, NULL);
 	
 	return Tr_getResult(); 
 }
@@ -400,7 +403,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 					Ty_ty rty = S_look(tenv, result);
 					if(actualTy(rty)->kind == actualTy(resultty.ty)->kind){
 						Tr_exp proc = Tr_functionDec(fname, newl, resultty.exp);
-						Tr_procEntryExit1(newl, proc, Tr_formals(newl));
+						Tr_procEntryExit(newl, proc, Tr_formals(newl));
 						continue;
 					}
 					else{
@@ -411,7 +414,7 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 				else{
 					if(actualTy(resultty.ty)->kind == Ty_void){
 						Tr_exp proc = Tr_functionDec(fname, newl, resultty.exp);
-						Tr_procEntryExit1(newl, proc, Tr_formals(newl));
+						Tr_procEntryExit(newl, proc, Tr_formals(newl));
 						continue;
 					}
 					else{
@@ -488,8 +491,7 @@ struct expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_labe
 						return expTy(Tr_err(), Ty_Int());
 					}
 					ty = actualTy(ty);
-					int off = ex->u.intt;
-					return expTy(Tr_subscriptVar(base.exp, off), ty->u.array);
+					return expTy(Tr_subscriptVar(base.exp,sub.exp), ty->u.array);
 				}
 				else{
 					EM_error(var->pos, "array type required");
@@ -658,12 +660,16 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				//empty exp:()
 				ety.exp = Tr_nilExp();
 				ety.ty = Ty_Void();
+				return ety;
 			}
+
+			Tr_expList ll = NULL;
 			for(seq=get_seqexp_seq(a); seq; seq=seq->tail){
 				A_exp ex = seq->head;
 				ety = transExp(venv, tenv, ex, l, label);
+				ll = Tr_ExpList(ety.exp, ll);
 			}
-			return ety;
+			return expTy(Tr_SeqExp(ll), ety.ty);
 		}
 		case A_assignExp:{
 			
@@ -750,14 +756,16 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			struct expty hity = transExp(venv, tenv, hi, l, label);
 
 			if(loty.ty->kind == Ty_int && loty.ty->kind == hity.ty->kind){
+				Tr_access vac = Tr_allocLocal(l, get_forexp_esc(a));
 				S_beginScope(venv);
 				S_enter(venv, var, E_ROVarEntry(
-						Tr_allocLocal(l, get_forexp_esc(a)),
+						vac,
 						loty.ty));
 				struct expty bodyty = transExp(venv, tenv, body, l, done);
 				S_endScope(venv);
 				if(bodyty.ty->kind == Ty_void){
-					return expTy(Tr_forExp(loty.exp, hity.exp, bodyty.exp, done), bodyty.ty);
+					Tr_exp forv = Tr_simpleVar(vac, l);
+					return expTy(Tr_forExp(forv, loty.exp, hity.exp, bodyty.exp, done), bodyty.ty);
 				}
 				else{
 					EM_error(body->pos, "forbody must produce no value");
@@ -777,17 +785,19 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 			A_decList decs; 
 			A_exp body = get_letexp_body(a);
 
-			
+			Tr_expList li = NULL;
 			S_beginScope(tenv); S_beginScope(venv);
 			for(decs=get_letexp_decs(a); decs; decs=decs->tail){
 				A_dec dec = decs->head;
-				transDec(venv, tenv, dec, l, label);
+				Tr_exp ee = transDec(venv, tenv, dec, l, label);
+				li = Tr_ExpList(ee, li);
 			}
 			//printf("dec over\n");
 			struct expty bodyty = transExp(venv, tenv, body, l, label);
 			S_endScope(venv); S_endScope(tenv);
-
-			return bodyty;
+			//li = Tr_ExpList(bodyty.exp, li);
+			//return bodyty;
+			return expTy(Tr_letExp(li, bodyty.exp),bodyty.ty);
 
 		}
 		case A_arrayExp:{

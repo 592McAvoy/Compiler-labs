@@ -5,7 +5,6 @@
 #include "absyn.h"
 #include "temp.h"
 #include "tree.h"
-#include "printtree.h"
 #include "frame.h"
 #include "translate.h"
 
@@ -165,12 +164,16 @@ static struct Cx unCx(Tr_exp e){
             cx.trues = NULL;
             cx.falses = NULL;
             cx.stm = NULL;
-            //printf("error");
+            printf("error UnCx(T_stm)\n");
 			/*error*/ return cx;
         }
 		case Tr_cx:
 			return e->u.cx;
 	}
+}
+
+void Tr_print(Tr_exp e){
+    printStmList(stderr, T_StmList(unNx(e),NULL));
 }
 
 
@@ -234,6 +237,7 @@ Tr_accessList Tr_formals(Tr_level level){
 Tr_exp Tr_err(){
     return Tr_Ex(T_Const(0));
 }
+
 //transVar
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l){
 	Tr_level vl = acc->level;
@@ -256,8 +260,11 @@ Tr_exp Tr_fieldVar(Tr_exp base, int cnt){
 	return Tr_Ex(field);
 }
 
-Tr_exp Tr_subscriptVar(Tr_exp base, int off){
-	return Tr_fieldVar(base,off);
+Tr_exp Tr_subscriptVar(Tr_exp base, Tr_exp off){
+	T_exp b = unEx(base);
+	T_exp field = T_Mem(T_Binop(T_plus, 
+                            T_Binop(T_mul, T_Const(F_wordsize), unEx(off)), b));
+	return Tr_Ex(field);
 }
 
 //transExp
@@ -289,6 +296,10 @@ Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level env
 		envl = envl->parent;
 	}
     args = T_ExpList(fp, args);
+
+    Tr_exp tmp = Tr_Ex(T_Call(T_Name(fname), args));
+    //Tr_print(tmp);
+    //printf("call over\n");
 
     return Tr_Ex(T_Call(T_Name(fname), args));
 }
@@ -364,6 +375,23 @@ Tr_exp Tr_recordExp(Tr_expList list, int cnt){
     
     return Tr_Ex(finall);    
 }
+Tr_exp Tr_SeqExp(Tr_expList list){
+    T_exp e = unEx(list->head);
+    T_stm s = NULL;
+    Tr_expList p;
+    for(p=list->tail;p;p=p->tail){
+        if(s){
+            s = T_Seq(unNx(p->head),s);
+        }
+        else{
+            s = unNx(p->head);
+        }
+    }
+    if(!s){
+        return Tr_Ex(e);
+    }
+    return Tr_Ex(T_Eseq(s,e));
+}
 Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val){
     return Tr_Nx(T_Move(unEx(pos), unEx(val)));
 }
@@ -375,6 +403,20 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
     doPatch(testCx.falses,f);
 
     T_stm testStm = testCx.stm;//Cx(t,f)
+    T_exp thenexp = unEx(then);
+    T_exp elseexp = unEx(elsee);
+
+    Temp_temp r = Temp_newtemp();
+
+    T_exp e = T_Eseq(T_Move(T_Temp(r), thenexp),
+                T_Eseq(testStm,
+                    T_Eseq(T_Label(f),
+                        T_Eseq(T_Move(T_Temp(r), elseexp),
+                            T_Eseq(T_Label(t),
+                                T_Temp(r))))));
+    return Tr_Ex(e);
+
+    /*T_stm testStm = testCx.stm;//Cx(t,f)
 
     T_stm thenStm;//t
     if(then->kind == Tr_cx){
@@ -393,11 +435,11 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
     }
 
     T_stm s = T_Seq(testStm,
-                    T_Seq(T_Label(t),
-                        T_Seq(thenStm,
-                            T_Seq(T_Label(f), elseStm))));
-    
-    return Tr_Nx(s);
+                    T_Seq(T_Label(f),
+                        T_Seq(elseStm,
+                            T_Seq(T_Label(t), thenStm))));
+        
+    return Tr_Nx(s);*/
 }
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
     Temp_label start = Temp_newlabel();
@@ -417,11 +459,10 @@ Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
     
     return Tr_Nx(s);
 }
-Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){
+Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){
     T_exp low = unEx(lo);
     T_exp high = unEx(hi);    
-    Temp_temp r = Temp_newtemp();
-    T_exp i = T_Temp(r);
+    T_exp i = unEx(forvar);
     Temp_label loop = Temp_newlabel();
     Temp_label pass = Temp_newlabel();
 
@@ -445,10 +486,24 @@ Tr_exp Tr_forExp(Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){
 Tr_exp Tr_breakExp(Temp_label done){
     return Tr_Nx(T_Jump(T_Name(done),Temp_LabelList(done,NULL)));
 }
+Tr_exp Tr_letExp(Tr_expList dec, Tr_exp body){
+    T_stm s = NULL;
+    for(Tr_expList p=dec;p;p=p->tail){
+        if(s){
+            s = T_Seq(unNx(p->head), s);
+        }
+        else{
+            s = unNx(p->head);
+        }
+    }
+    if(!s){
+        return body;
+    }
+    return Tr_Ex(T_Eseq(s, unEx(body)));
+}
 Tr_exp Tr_arrayExp(int size, Tr_exp initvar){
     Temp_temp r = Temp_newtemp();
     T_exp base = T_Temp(r);
-
     T_stm init = T_Move(base, F_externalCall("initArray", T_ExpList(T_Const(size),
                                                                T_ExpList(unEx(initvar),NULL))));
 
@@ -486,6 +541,10 @@ Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody){
     //4.enter params    
     //5.Store instructions to save any callee-saved registers
     //6.The function body
+    /*printf("function body:\n");
+    Tr_print(fbody);
+    printf("\n\n");*/
+
     //Epilogue
     //7.An instruction to move the return value to RA register
     T_stm moveRet = T_Move(RV, unEx(fbody));
@@ -500,7 +559,7 @@ Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody){
     return Tr_Ex(T_Const(0));
 }
 
-void Tr_procEntryExit1(Tr_level level, Tr_exp body, Tr_accessList formals){
+void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals){
 	F_frame f = level->frame;
 	//fill holes
 	T_stm s = F_procEntryExit1(f, unNx(body));
