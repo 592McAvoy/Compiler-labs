@@ -245,7 +245,7 @@ Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l){
 	T_exp fp = T_Temp(F_FP());//addr of current fp
 
 	//calculate SL
-	int SLoff = F_wordsize;//SL is 1 wordsize off FP
+	int SLoff = -F_wordsize;//SL is 1 wordsize off FP
 	while(l != vl){
 		fp = T_Mem(T_Binop(T_plus, T_Const(SLoff), fp));
 		l = l->parent;
@@ -280,17 +280,20 @@ Tr_exp Tr_stringExp(string str){
     frags = F_FragList(strf, frags);
     return Tr_Ex(T_Name(lab));
 }
-Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl){
+Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl, string func){
     T_expList args = NULL;
     for(Tr_expList l=params; l; l=l->tail){
         Tr_exp param = l->head;
         args = T_ExpList(unEx(param), args);
     }
-
+    if(!fname){
+        return Tr_Ex(F_externalCall(func, args));
+    }
+    
     //calculate SL
     Tr_level target = fl->parent;
     T_exp fp = T_Temp(F_FP());//addr of current fp	
-	int SLoff = F_wordsize;//SL is 1 wordsize off FP
+	int SLoff = -F_wordsize;//SL is 1 wordsize off FP
 	while(envl != target){
 		fp = T_Mem(T_Binop(T_plus, T_Const(SLoff), fp));
 		envl = envl->parent;
@@ -398,6 +401,7 @@ Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val){
 Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
     Temp_label t = Temp_newlabel();
     Temp_label f = Temp_newlabel();
+    Temp_label next = Temp_newlabel();
     struct Cx testCx = unCx(test);
     doPatch(testCx.trues, t);
     doPatch(testCx.falses,f);
@@ -408,38 +412,13 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
 
     Temp_temp r = Temp_newtemp();
 
-    T_exp e = T_Eseq(T_Move(T_Temp(r), thenexp),
-                T_Eseq(testStm,
-                    T_Eseq(T_Label(f),
-                        T_Eseq(T_Move(T_Temp(r), elseexp),
-                            T_Eseq(T_Label(t),
-                                T_Temp(r))))));
+    T_exp e = T_Eseq(testStm,
+                T_Eseq(T_Label(t),
+                    T_Eseq(T_Seq(T_Move(T_Temp(r),thenexp), T_Jump(T_Name(next), Temp_LabelList(next,NULL))),
+                        T_Eseq(T_Label(f),
+                            T_Eseq(T_Seq(T_Move(T_Temp(r),elseexp), T_Jump(T_Name(next), Temp_LabelList(next,NULL))),
+                                T_Eseq(T_Label(next), T_Temp(r)))))));
     return Tr_Ex(e);
-
-    /*T_stm testStm = testCx.stm;//Cx(t,f)
-
-    T_stm thenStm;//t
-    if(then->kind == Tr_cx){
-        thenStm = then->u.cx.stm;
-    }
-    else{
-        thenStm = unNx(then);
-    }
-
-    T_stm elseStm;//f
-    if(elsee->kind == Tr_cx){
-        elseStm = elsee->u.cx.stm;
-    }
-    else{
-        elseStm = unNx(elsee);
-    }
-
-    T_stm s = T_Seq(testStm,
-                    T_Seq(T_Label(f),
-                        T_Seq(elseStm,
-                            T_Seq(T_Label(t), thenStm))));
-        
-    return Tr_Nx(s);*/
 }
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
     Temp_label start = Temp_newlabel();
@@ -521,7 +500,7 @@ Tr_exp Tr_varDec(Tr_access acc, Tr_exp init){
 }
 //wait to be re-design
 Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody){
-    T_exp SP = T_Temp(F_SP());
+    /*T_exp SP = T_Temp(F_SP());
     T_exp FP = T_Temp(F_FP());
     T_exp PC = T_Temp(F_PC());
     T_exp RV = T_Temp(F_RV());
@@ -547,7 +526,7 @@ Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody){
 
     //Epilogue
     //7.An instruction to move the return value to RA register
-    T_stm moveRet = T_Move(RV, unEx(fbody));
+    /*T_stm moveRet = T_Move(RV, unEx(fbody));
     //8.Load instructions to restore the callee-save registers
     //9.An instruction to reset the stack pointer (to deallocate the frame)
     //10.A return instruction (Jump to the return address)
@@ -555,14 +534,16 @@ Tr_exp Tr_functionDec(Temp_label fname, Tr_level l, Tr_exp fbody){
                     T_Seq(T_Move(SP, T_Mem(T_Binop(T_plus,T_Const(2*F_wordsize),FP))),//restore SP
                     T_Move(FP, T_Mem(T_Binop(T_plus,T_Const(F_wordsize),FP)))));//restore FP
     //11.Pseduo-instructions, as needed, to announce the end of a function
-
+*/
     return Tr_Ex(T_Const(0));
 }
 
 void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals){
 	F_frame f = level->frame;
 	//fill holes
-	T_stm s = F_procEntryExit1(f, unNx(body));	
+	T_stm s = T_Move(T_Temp(F_RV()), unEx(body)); 
+    s = F_procEntryExit1(f, s);
+
 	F_frag proc = F_ProcFrag(s, f);
 
 	frags = F_FragList(proc, frags);

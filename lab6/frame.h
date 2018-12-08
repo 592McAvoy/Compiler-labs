@@ -28,8 +28,10 @@ Temp_map F_tempMap;
 Temp_temp F_FP(void);//frame ptr
 Temp_temp F_SP(void);//stack ptr
 Temp_temp F_RV(void);//return value
-Temp_temp F_PC(void);//program counter
 Temp_temp F_ARG(int idx);//func arg_i
+
+Temp_tempList F_callerSave();//callersave regs
+Temp_tempList F_calleeSave();//calleesave regs
 
 extern const int F_wordsize;
 T_exp F_exp(F_access acc, T_exp framePtr);

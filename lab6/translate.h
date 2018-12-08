@@ -54,7 +54,7 @@ Tr_exp Tr_subscriptVar(Tr_exp base, Tr_exp off);
 Tr_exp Tr_nilExp();
 Tr_exp Tr_intExp(int i);
 Tr_exp Tr_stringExp(string str);
-Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl);
+Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl, string func);
 Tr_exp Tr_arithExp(A_oper op, Tr_exp left, Tr_exp right);
 Tr_exp Tr_intCompExp(A_oper op, Tr_exp left, Tr_exp right);
 Tr_exp Tr_strCompExp(A_oper op, Tr_exp left, Tr_exp right);

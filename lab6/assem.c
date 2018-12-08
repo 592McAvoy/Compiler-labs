@@ -91,30 +91,36 @@ static void format(char *result, string assem,
   for(p = assem; p && *p != '\0'; p++){
     if (*p == '`') {
       switch(*(++p)) {
-      case 's': {int n = atoi(++p);
-		 string s = Temp_look(m, nthTemp(src,n));
-		 strcpy(result+i, s);
-		 i += strlen(s);
-	       }
-	break;
-      case 'd': {int n = atoi(++p);
-		 string s = Temp_look(m, nthTemp(dst,n));
-		 strcpy(result+i, s);
-		 i += strlen(s);
-	       }
-	break;
-      case 'j': assert(jumps); 
-	       {int n = atoi(++p);
-		 string s = Temp_labelstring(nthLabel(jumps->labels,n));
-		 strcpy(result+i, s);
-		 i += strlen(s);
-	       }
-	break;
-      case '`': result[i] = '`'; i++; 
-	break;
-      default: assert(0);
-      }}
-    else {result[i] = *p; i++; }}
+        case 's': {
+          int n = atoi(++p);
+          string s = Temp_look(m, nthTemp(src,n));
+          //printf("test reg:%s\n",s);
+          strcpy(result+i, s);
+          i += strlen(s);
+        }
+        break;
+        case 'd': {
+          int n = atoi(++p);
+          string s = Temp_look(m, nthTemp(dst,n));
+          strcpy(result+i, s);
+          i += strlen(s);
+        }
+        break;
+        case 'j': assert(jumps); 
+        {
+          int n = atoi(++p);
+          string s = Temp_labelstring(nthLabel(jumps->labels,n));
+          strcpy(result+i, s);
+          i += strlen(s);
+        }
+        break;
+        case '`': result[i] = '`'; i++; 
+        break;
+        default: assert(0);
+      }
+    }
+    else {result[i] = *p; i++; }
+  }
   result[i] = '\0';
 }
 

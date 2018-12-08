@@ -561,7 +561,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 				}
 				Temp_label fname =  get_func_label(x);
 				Tr_level flev =	get_func_level(x);
-				return expTy(Tr_callExp(fname, ls, flev, l), result);
+				return expTy(Tr_callExp(fname, ls, flev, l, S_name(func)), result);
 			}
 			else{
 				EM_error(a->pos, "undefined function %s", S_name(func));
@@ -763,6 +763,7 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 						loty.ty));
 				struct expty bodyty = transExp(venv, tenv, body, l, done);
 				S_endScope(venv);
+				//Tr_print(bodyty.exp);
 				if(bodyty.ty->kind == Ty_void){
 					Tr_exp forv = Tr_simpleVar(vac, l);
 					return expTy(Tr_forExp(forv, loty.exp, hity.exp, bodyty.exp, done), bodyty.ty);
