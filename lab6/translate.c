@@ -421,20 +421,22 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
     return Tr_Ex(e);
 }
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
-    Temp_label start = Temp_newlabel();
+    Temp_label check = Temp_newlabel();
+    Temp_label run = Temp_newlabel();
     
     struct Cx testCx = unCx(test);
     
-    doPatch(testCx.trues,start);
+    doPatch(testCx.trues,run);
     doPatch(testCx.falses,done);
     
     T_stm testStm = testCx.stm;
 
-    T_stm s = T_Seq(T_Label(start),
+    T_stm s = T_Seq(T_Label(check),
                 T_Seq(testStm,
-                    T_Seq(unNx(body),
-                        T_Seq(T_Jump(T_Name(start),Temp_LabelList(start,NULL)),
-                            T_Label(done)))));
+                    T_Seq(T_Label(run),
+                        T_Seq(unNx(body),
+                            T_Seq(T_Jump(T_Name(check),Temp_LabelList(check,NULL)),
+                                T_Label(done))))));
     
     return Tr_Nx(s);
 }

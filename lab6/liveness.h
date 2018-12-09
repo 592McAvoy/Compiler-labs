@@ -16,5 +16,6 @@ struct Live_graph {
 Temp_temp Live_gtemp(G_node n);
 
 struct Live_graph Live_liveness(G_graph flow);
+void Live_showInfo(void *p);
 
 #endif

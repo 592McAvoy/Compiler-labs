@@ -59,9 +59,9 @@ static void MovOp(Temp_temp src, Temp_temp dst, T_exp e){
     switch(e->kind){
         case T_CONST:{
             char mstr[100];
-            sprintf(mstr,"movq `s0, %d(`d0)", e->u.CONST);
+            sprintf(mstr,"movq `s0, %d(`s1)", e->u.CONST);
             //printf("%s\n",mstr);
-            emit(AS_Move(String(mstr), Temp_TempList(dst,NULL), Temp_TempList(src,NULL)));
+            emit(AS_Move(String(mstr), NULL, Temp_TempList(src,Temp_TempList(dst,NULL))));
             return;
         }
         case T_TEMP:{
@@ -69,8 +69,8 @@ static void MovOp(Temp_temp src, Temp_temp dst, T_exp e){
             if(t == F_FP()){
                 t = RMfp();
             }
-            string mstr = "movq `s0, (`d0,`d1)";
-            emit(AS_Move(mstr, Temp_TempList(dst,Temp_TempList(e->u.TEMP, NULL)), Temp_TempList(t,NULL)));
+            string mstr = "movq `s0, (`s1,`s2)";
+            emit(AS_Move(mstr, NULL, Temp_TempList(t,Temp_TempList(dst,Temp_TempList(e->u.TEMP, NULL)))));
             return;
         }
     }
@@ -137,12 +137,12 @@ static void munchStm(T_stm stm){
                 T_exp MEM = dst->u.MEM;
                 if(MEM->kind == T_TEMP){
                     Temp_temp TEMP = MEM->u.TEMP;
-                    emit(AS_Move("movq `s0, (`d0)", Temp_TempList(TEMP,NULL),Temp_TempList(s,NULL)));
+                    emit(AS_Move("movq `s0, (`s1)", NULL,Temp_TempList(s,Temp_TempList(TEMP,NULL))));
                     return;
                 }     
                 if(MEM->kind == T_CONST){
                     Temp_temp d = munchExp(MEM);
-                    emit(AS_Move("movq `s0, (`d0)", Temp_TempList(d,NULL),Temp_TempList(s,NULL)));
+                    emit(AS_Move("movq `s0, (`s1)", NULL,Temp_TempList(s,Temp_TempList(d,NULL))));
                     return;
                 }       
                 if(MEM->kind == T_BINOP){
@@ -151,7 +151,7 @@ static void munchStm(T_stm stm){
                     T_exp right = MEM->u.BINOP.right;
                     if(!isPlainExp(left) && !isPlainExp(right)){
                         Temp_temp d = munchExp(MEM);
-                        emit(AS_Move("movq `s0, (`d0)", Temp_TempList(d,NULL),Temp_TempList(s,NULL)));
+                        emit(AS_Move("movq `s0, (`s1)", NULL ,Temp_TempList(s,Temp_TempList(d,NULL))));
                         return;
                     }
                     if(!isPlainExp(left)){
@@ -318,8 +318,8 @@ static Temp_tempList munchArgs(int cnt, T_expList args){
     else{
         munchArgs(cnt+1, args->tail);
         char str[100];
-        sprintf(str, "movq `s0, %d(`d0)", (cnt-6)*F_wordsize);
-        emit(AS_Move(String(str), Temp_TempList(F_SP(),NULL),Temp_TempList(src,NULL)));
+        sprintf(str, "movq `s0, %d(`s1)", (cnt-6)*F_wordsize);
+        emit(AS_Move(String(str), NULL, Temp_TempList(src,Temp_TempList(F_SP(),NULL))));
         return NULL;
     }
 

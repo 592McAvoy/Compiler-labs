@@ -27,9 +27,7 @@ struct F_frame_ {
 	int length;
 
 	//register lists for the frame
-	Temp_tempList calleesaves;
-	Temp_tempList callersaves;
-	Temp_tempList specialregs;
+	F_accessList calleesaves;
 };
 
 //varibales
@@ -85,6 +83,24 @@ F_accessList makeFormalsF(F_frame f, U_boolList formals, int* cntp){
 	}
 }
 
+F_accessList F_calleePos(F_frame f){
+	Temp_tempList regs = F_calleeSave();
+	F_accessList l = NULL;
+	F_accessList last = NULL;
+	for(;regs;regs=regs->tail){
+		F_access acc = F_allocLocal(f,FALSE);
+		if(!last){
+			last = F_AccessList(acc, NULL);
+			l = last;
+		}
+		else{
+			last->tail = F_AccessList(acc, NULL);
+			last = last->tail;
+		}
+	}
+	return l;
+}
+
 F_frame F_newFrame(Temp_label name, U_boolList formals){
 	F_frame f = checked_malloc(sizeof(*f));
 	f->length = 0;
@@ -97,9 +113,7 @@ F_frame F_newFrame(Temp_label name, U_boolList formals){
 	f->argSize = *argsize;
 	
 
-	f->calleesaves = NULL;
-	f->callersaves = NULL;
-	f->specialregs = NULL;
+	f->calleesaves = F_calleePos(f);
 
 	return f;
 }
@@ -135,7 +149,7 @@ Temp_temp F_FP(void){
 	static Temp_temp fp  = NULL;
 	if(!fp){
 		fp = Temp_newtemp();
-		Temp_enter(F_tempMap, fp, "%rbp");
+		Temp_enter(F_tempMap, fp, "fp");
 	}
 	return fp;
 }
@@ -217,6 +231,7 @@ Temp_tempList F_calleeSave(){
 	static Temp_temp r14 = NULL;
 	static Temp_temp r15 = NULL;
 	static Temp_temp rbx = NULL;
+	static Temp_temp rbp = NULL;
 	
 	if(!calleeSave){
 		r12 = Temp_newtemp();
@@ -229,12 +244,14 @@ Temp_tempList F_calleeSave(){
 		Temp_enter(F_tempMap, r15, "%r15");
 		rbx = Temp_newtemp();
 		Temp_enter(F_tempMap, rbx, "%rbx");
+		rbp = Temp_newtemp();
+		Temp_enter(F_tempMap, rbp, "%rbp");
 		calleeSave = Temp_TempList(r12, 
 						Temp_TempList(r13,
 							Temp_TempList(r14, 
 								Temp_TempList(r15, 
 									Temp_TempList(rbx,
-										Temp_TempList(F_FP(), NULL))))));
+										Temp_TempList(rbp, NULL))))));
 	}
 	return calleeSave;
 }
@@ -305,13 +322,41 @@ T_stm F_procEntryExit1(F_frame f, T_stm stm){
 		}
 		cnt += 1;
 	}
-	//callee save
 
+	//callee save
+	T_stm save = NULL;
+	F_accessList al = f->calleesaves;
+	Temp_tempList tl = F_calleeSave();
+	for(;tl;tl=tl->tail, al=al->tail){
+		T_exp pos = F_exp(al->head, fp);
+		if(save){
+			save = T_Seq(T_Move(pos, T_Temp(tl->head)), save);
+		}
+		else{
+			save = T_Move(pos, T_Temp(tl->head));
+		}
+	}
+
+	//callee restore
+	T_stm restore = NULL;
+	al = f->calleesaves;
+	tl = F_calleeSave();
+	for(;tl;tl=tl->tail, al=al->tail){
+		T_exp pos = F_exp(al->head, fp);
+		if(restore){
+			restore = T_Seq(T_Move(T_Temp(tl->head),pos), restore);
+		}
+		else{
+			restore = T_Move(T_Temp(tl->head), pos);
+		}
+	}
+
+	T_stm ness = T_Seq(save,T_Seq(stm, restore));
 	
 	if(!view){
-		return stm;
+		return ness;
 	}
-	return T_Seq(view,stm);
+	return T_Seq(view,ness);
 }
 AS_instrList F_procEntryExit2(AS_instrList body){
 	static Temp_tempList returnSink = NULL ;

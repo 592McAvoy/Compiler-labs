@@ -53,7 +53,7 @@ Temp_tempList FG_def(G_node n) {
 }
 
 Temp_tempList FG_use(G_node n) {
-	//your code here.
+	//your code here
 	AS_instr ins = G_nodeInfo(n);
 	switch(ins->kind){
 		case I_OPER:return ins->u.OPER.src;
@@ -65,7 +65,7 @@ Temp_tempList FG_use(G_node n) {
 bool FG_isMove(G_node n) {
 	//your code here.
 	AS_instr ins = G_nodeInfo(n);
-	return ins->kind == I_MOVE;
+	return ins->kind == I_MOVE && strstr(ins->u.MOVE.assem,"movq `s0, `d0");
 }
 
 static labelNodeList labels;
@@ -92,9 +92,12 @@ static void fillJmp(labelNode ln){
 	}
 }
 
-void showInfo(AS_instr ins){
-	printf("%s",ins->u.LABEL.assem);
+void FG_showInfo(void *p){
+	AS_instr ins = p;
+	AS_print(stdout, ins, Temp_layerMap(F_tempMap, Temp_name()));
 }
+
+/* GlowGraph -- [node -> As_inst]*/
 G_graph FG_AssemFlowGraph(AS_instrList il) {
 	//your code here.
 	G_graph g = G_Graph();
@@ -113,7 +116,15 @@ G_graph FG_AssemFlowGraph(AS_instrList il) {
 				lab = ins->u.LABEL.label; 
 				break;
 			}
-			case I_MOVE:
+			case I_MOVE:{
+				Temp_tempList dst = ins->u.MOVE.dst;
+				Temp_tempList src = ins->u.MOVE.src;
+				string ass = ins->u.MOVE.assem;				
+				if(strstr(ass,"movq `s0, `d0")){
+					if(Temp_int(dst->head) == Temp_int(src->head))
+						break;
+				} 
+			}
 			case I_OPER:{
 				G_node node = G_Node(g, ins);
 				if(prevNode){
@@ -126,8 +137,7 @@ G_graph FG_AssemFlowGraph(AS_instrList il) {
 
 				prevNode = node;
 				if(ins->u.OPER.jumps){
-					char *in = strstr(ins->u.OPER.assem, "jmp");
-					if(in)
+					if(strstr(ins->u.OPER.assem, "jmp"))
 						prevNode = NULL;
 					waits = LabelNodeList(LabelNode(node, NULL, ins->u.OPER.jumps), waits);
 				}
@@ -140,8 +150,5 @@ G_graph FG_AssemFlowGraph(AS_instrList il) {
 	for(labelNodeList p=waits;p;p=p->tail){
 		fillJmp(p->head);
 	}
-
-	G_show(stdout, G_nodes(g), showInfo);
-	printf("\n-------====flow graph=====-----\n");
 	return g;
 }
