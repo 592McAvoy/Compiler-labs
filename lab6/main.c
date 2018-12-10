@@ -68,18 +68,12 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
  //printf("-------====trace=====-----\n");
 
  iList  = F_codegen(frame, stmList); /* 9 */
- AS_printInstrList(stdout, iList, Temp_layerMap(F_tempMap, Temp_name()));
- printf("----======before RA=======-----\n");
+ //AS_printInstrList(stdout, iList, Temp_layerMap(F_tempMap, Temp_name()));
+ //printf("----======before RA=======-----\n");
 
- G_graph fg = FG_AssemFlowGraph(iList);  /* 10.1 */
- //G_show(stdout, G_nodes(fg), FG_showInfo);
- //printf("\n-------====flow graph=====-----\n");
+ 
 
- struct Live_graph lg = Live_liveness(fg);  /* 10.2 */
- G_show(stdout, G_nodes(lg.graph), Live_showInfo);
- printf("\n-------==== CF graph=====-----\n");
-
- //struct RA_result ra = RA_regAlloc(frame, iList);  /* 11 */
+ struct RA_result ra = RA_regAlloc(frame, iList);  /* 11 */
 
  //fprintf(out, "BEGIN function\n");
 // AS_printInstrList (out, proc->body,

@@ -11,20 +11,6 @@
 #include "liveness.h"
 #include "table.h"
 
-Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail) {
-	Live_moveList lm = (Live_moveList) checked_malloc(sizeof(*lm));
-	lm->src = src;
-	lm->dst = dst;
-	lm->tail = tail;
-	return lm;
-}
-
-
-Temp_temp Live_gtemp(G_node n) {
-	//your code here.
-	return (Temp_temp)G_nodeInfo(n);
-}
-
 
 static G_graph cfGraph; //cfnode -> temp
 static G_nodeList revFlow; 
@@ -44,6 +30,25 @@ liveInfo LiveInfo(Temp_tempList in, Temp_tempList out){
 	i->out = out;
 	return i;
 }
+
+
+nodeInfo NodeInfo(Temp_temp t, int d, enum State s){
+	nodeInfo i = checked_malloc(sizeof(*i));
+	i->degree = d;
+	i->reg = t;
+	i->stat = s;
+	i->alias = NULL;
+	return i;
+}
+
+Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail) {
+	Live_moveList lm = (Live_moveList) checked_malloc(sizeof(*lm));
+	lm->src = src;
+	lm->dst = dst;
+	lm->tail = tail;
+	return lm;
+}
+
 
 
 
@@ -70,6 +75,7 @@ bool inList(Temp_tempList list, Temp_temp t){
 	}
 	return FALSE;
 }
+
 bool Equal(Temp_tempList A, Temp_tempList B){
 	Temp_tempList list = A;
 	for(; A&&B; A=A->tail,B=B->tail){
@@ -103,10 +109,24 @@ Temp_tempList Minus(Temp_tempList A, Temp_tempList B){
 }
 
 //procedure
+Temp_temp Live_gtemp(G_node n) {
+	//your code here.
+	nodeInfo p = G_nodeInfo(n);
+	Temp_temp t = p->reg;
+	return t;
+}
+
+
 void Live_showInfo(void *p){
-	Temp_temp t = p;
+	nodeInfo t = p;
 	Temp_map map = Temp_layerMap(F_tempMap, Temp_name());
-	printf("%s\t",Temp_look(map, t));
+	printf("%s\t",Temp_look(map, t->reg));
+}
+void Live_prMovs(Live_moveList ml){
+	Temp_map map = Temp_layerMap(F_tempMap, Temp_name());
+	for(;ml;ml=ml->tail){
+		printf("%s -> %s\n", Temp_look(map, Live_gtemp( ml->src)), Temp_look(map, Live_gtemp( ml->dst)));
+	}
 }
 static void genGraph(G_graph flow){
 	cnt = 0;
@@ -115,14 +135,14 @@ static void genGraph(G_graph flow){
 		for(Temp_tempList tp = FG_def(fnode);tp;tp=tp->tail){
 			Temp_temp t = tp->head;
 			if(!inPool(t)){
-				G_node cfnode = G_Node(cfGraph,t);
+				G_node cfnode = G_Node(cfGraph,NodeInfo(t,0,0));
 				TAB_enter(TNtab, t, cfnode);
 			}
 		}
 		for(Temp_tempList tp = FG_use(fnode);tp;tp=tp->tail){
 			Temp_temp t = tp->head;
 			if(!inPool(t)){
-				G_node cfnode = G_Node(cfGraph,t);
+				G_node cfnode = G_Node(cfGraph,NodeInfo(t,0,0));
 				TAB_enter(TNtab, t, cfnode);
 			}
 		}
@@ -164,26 +184,31 @@ static void addConf(){
 		G_node fnode = np->head;
 
 		liveInfo info = TAB_look(liveTab, fnode);
-		Temp_tempList in = info->in;
-
-		//add conflicts among [in]
-		for(Temp_tempList p1=in;p1;p1=p1->tail){
-			G_node cf1 = TAB_look(TNtab, p1->head);
-			for(Temp_tempList p2=p1->tail;p2;p2=p2->tail){
-				G_node cf2 = TAB_look(TNtab, p2->head);
-				G_addEdge(cf1, cf2);
-			}
-		}
+		Temp_tempList live = info->out;
 
 		//move
 		if(FG_isMove(fnode)){
+			live = Minus(live, FG_use(fnode));
+
 			Temp_temp dst = FG_def(fnode)->head;
 			G_node d = TAB_look(TNtab, dst);
 			Temp_temp src = FG_use(fnode)->head;
 			G_node s = TAB_look(TNtab, src);
-			//G_rmEdge(s, d);
 			movs = Live_MoveList(s, d, movs);
 		}
+
+		//add conflicts 
+		Temp_tempList def = FG_def(fnode);
+		live = Union(live, def);
+		for(Temp_tempList p1=def;p1;p1=p1->tail){
+			G_node cf1 = TAB_look(TNtab, p1->head);
+			for(Temp_tempList p2=live;p2;p2=p2->tail){
+				G_node cf2 = TAB_look(TNtab, p2->head);
+				if(G_goesTo(cf2, cf1) || cf1 == cf2)continue;
+				G_addEdge(cf1, cf2);
+			}
+		}
+
 	}
 }
 
