@@ -32,6 +32,7 @@ Temp_temp F_ARG(int idx);//func arg_i
 
 Temp_tempList F_callerSave();//callersave regs
 Temp_tempList F_calleeSave();//calleesave regs
+Temp_tempList F_register();//all regs
 
 extern const int F_wordsize;
 T_exp F_exp(F_access acc, T_exp framePtr);

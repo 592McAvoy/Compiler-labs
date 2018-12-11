@@ -68,8 +68,8 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
  //printf("-------====trace=====-----\n");
 
  iList  = F_codegen(frame, stmList); /* 9 */
- //AS_printInstrList(stdout, iList, Temp_layerMap(F_tempMap, Temp_name()));
- //printf("----======before RA=======-----\n");
+ AS_printInstrList(stdout, iList, Temp_layerMap(F_tempMap, Temp_name()));
+ printf("----======before RA=======-----\n");
 
  
 

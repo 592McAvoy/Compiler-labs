@@ -107,7 +107,7 @@ void G_show(FILE *out, G_nodeList p, void showInfo(void *)) {
     if (showInfo) 
       showInfo(n->info);
     fprintf(out, " (%d): ", n->mykey); 
-    for(q=G_succ(n); q!=NULL; q=q->tail) 
+    for(q=G_adj(n); q!=NULL; q=q->tail) 
            fprintf(out, "%d ", q->head->mykey);
     fprintf(out, "\n");
   }

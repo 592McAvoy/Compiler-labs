@@ -255,6 +255,23 @@ Temp_tempList F_calleeSave(){
 	}
 	return calleeSave;
 }
+Temp_tempList F_register(){
+	static Temp_tempList regs = NULL;
+	if(!regs){
+		regs = Temp_TempList(F_SP(),
+					Temp_TempList(F_RV(),
+					Temp_TempList(F_ARG(0),
+					Temp_TempList(F_ARG(1),
+					Temp_TempList(F_ARG(2),
+					Temp_TempList(F_ARG(3),
+					Temp_TempList(F_ARG(4),
+					Temp_TempList(F_ARG(5), F_calleeSave()))))))));
+		Temp_tempList p;
+		for(p=regs;p->tail;p=p->tail){}
+		p->tail = F_callerSave();
+	}
+	return regs;											
+}
 
 T_exp F_exp(F_access acc, T_exp framePtr){
 	if(acc->kind == inFrame){

@@ -35,10 +35,22 @@ Live_moveList RMrelatedMovs(G_node node, Live_moveList list){
     return li;
 }
 
+Live_moveList CatMovList(Live_moveList A, Live_moveList B){
+    if(!A) return B;
+    Live_moveList p = A;
+    assert(p);
+    for(;p->tail;p=p->tail){}
+    p->tail = B;
+    return A;
+}
 
 
 G_nodeList NL_Union(G_nodeList A, G_nodeList B){
-    G_nodeList list = A;
+    G_nodeList list = NULL;
+    for(;A;A=A->tail){
+        G_node n = A->head;
+        list = G_NodeList(n, list);
+    }
     for(;B;B=B->tail){
         G_node n = B->head;
         if(!G_inNodeList(n, A)){
@@ -70,21 +82,21 @@ G_nodeList NL_Minus(G_nodeList A, G_nodeList B){
 G_nodeList NL_rmNode(G_nodeList li, G_node node){
     G_nodeList p = li;
     G_nodeList last = NULL;
-    while(li){
-        if(li->head == node){
+    while(p){
+        if(p->head == node){
             if(last){
-                last->tail = li->tail;
+                last->tail = p->tail;
                 break;
             }
             else{
-                p = p->tail;
+                li = li->tail;
                 break;
             }
         }
-        last = li;
-        li = li->tail;
+        last = p;
+        p = p->tail;
     }
-    return p;
+    return li;
 }
 
 #endif

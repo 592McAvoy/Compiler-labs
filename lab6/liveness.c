@@ -76,19 +76,14 @@ bool inList(Temp_tempList list, Temp_temp t){
 	return FALSE;
 }
 
-bool Equal(Temp_tempList A, Temp_tempList B){
-	Temp_tempList list = A;
-	for(; A&&B; A=A->tail,B=B->tail){
-		if(Temp_int(A->head) != Temp_int(B->head)){
-			break;
-		}
-	}
-	if(A != NULL || B != NULL)
-		return FALSE;
-	return TRUE;
-}
+
 Temp_tempList Union(Temp_tempList A, Temp_tempList B){
-	Temp_tempList list = A;
+	Temp_tempList list = NULL;
+	for(;A;A=A->tail){
+		Temp_temp tt = A->head;
+		list = Temp_TempList(tt, list);
+	}
+	//Temp_tempList list = A;
 	for(;B;B=B->tail){
 		Temp_temp tt = B->head;
 		if(!inList(A, tt)){
@@ -106,6 +101,12 @@ Temp_tempList Minus(Temp_tempList A, Temp_tempList B){
 		}
 	}
 	return list;
+}
+bool Equal(Temp_tempList A, Temp_tempList B){
+	if(Minus(A,B)==NULL && Minus(B,A)==NULL){
+		return TRUE;
+	}
+	return FALSE;
 }
 
 //procedure
