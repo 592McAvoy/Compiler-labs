@@ -5,6 +5,7 @@
 #include "absyn.h"
 #include "temp.h"
 #include "frame.h"
+#include "types.h"
 #include "printtree.h"
 
 /* Lab5: your code below */
@@ -62,12 +63,12 @@ Tr_exp Tr_ptrCompExp(A_oper op, Tr_exp left, Tr_exp right);
 Tr_exp Tr_recordExp(Tr_expList list, int cnt);
 Tr_exp Tr_SeqExp(Tr_expList list);
 Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val);
-Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee);
+Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee, Ty_ty type);
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done);
 Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done);
 Tr_exp Tr_breakExp(Temp_label done);
 Tr_exp Tr_letExp(Tr_expList dec, Tr_exp body);
-Tr_exp Tr_arrayExp(int size, Tr_exp initvar);
+Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp initvar);
 
 //transDec
 Tr_exp Tr_typeDec();

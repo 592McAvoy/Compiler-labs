@@ -302,15 +302,20 @@ static void SelectSpill(){
 	simplifyWorkList = G_NodeList(node, simplifyWorkList);
 }
 static void AssignColor(){
+	COL_map();
 	for(G_nodeList nl=nodeStack;nl;nl=nl->tail){
 		G_node node = nl->head;
+		//Temp_map map = Temp_layerMap(F_tempMap, Temp_name());
+		//printf("t%s\n", Temp_look(map, Live_gtemp(node)));
 		Temp_tempList colors = COL_allColor();
 		
 		for(G_nodeList adj=G_adj(node);adj;adj=adj->tail){
 			G_node t = adj->head;
+			//printf("\tadj t%s\n", Temp_look(map, Live_gtemp(t)));
 			G_nodeList used = NL_Union(precolored, coloredNode);
 			if(G_inNodeList(GetAlias(t), used)){
-				colors = COL_rmColor(t, colors);
+				colors = COL_rmColor(GetAlias(t), colors);
+				//printf("\t\trm one color\n");
 			}
 		}
 
@@ -348,6 +353,20 @@ procedure Main()
 	    Main() 
 
 */
+void printMovs(){
+	printf("\n-------==== spillworklist =====-----\n");
+	G_show(stdout, spillWorkList, RA_showInfo);	
+	printf("\n-------==== stack =====-----\n");
+	G_show(stdout, nodeStack, RA_showInfo);	
+	printf("\n-------==== coalescedMoves =====-----\n");
+	Live_prMovs(coalescedMoves);
+	printf("\n-------==== frozenMoves =====-----\n");
+	Live_prMovs(frozenMoves);
+	printf("\n-------==== constrainedMoves =====-----\n");
+	Live_prMovs(constrainedMoves);
+	printf("\n-------==== activeMoves =====-----\n");
+	Live_prMovs(activeMoves);
+}
 
 struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 	clear();
@@ -390,26 +409,27 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 			SelectSpill();
 		}
 	}
-	/*printf("\n-------==== spillworklist =====-----\n");
-	G_show(stdout, spillWorkList, RA_showInfo);	
-	printf("\n-------==== stack =====-----\n");
-	G_show(stdout, nodeStack, RA_showInfo);	
-	printf("\n-------==== coalescedMoves =====-----\n");
-	Live_prMovs(coalescedMoves);
-	printf("\n-------==== frozenMoves =====-----\n");
-	Live_prMovs(frozenMoves);
-	printf("\n-------==== constrainedMoves =====-----\n");
-	Live_prMovs(constrainedMoves);
-	printf("\n-------==== activeMoves =====-----\n");
-	Live_prMovs(activeMoves);*/
-	
+	//printMovs();
+		
 	AssignColor();
+
+	if(spilledNode){
+		printf("\n-------==== spillnode =====-----\n");
+		G_show(stdout, spilledNode, RA_showInfo);
+		COL_clearMap();
+		assert(0);
+	}
+
 	Temp_map map = Temp_layerMap(COL_map(),Temp_layerMap(F_tempMap, Temp_name()));
-		printf("BEGIN function\n");
-		AS_printInstrList (stdout, il, map);
- 		printf("END function\n");
-	
+	AS_rewrite(il, map);
+		//printf("BEGIN function\n");
+		//AS_printInstrList (stdout, il, map);
+ 		//printf("END function\n");
+					
 
 	struct RA_result ret;
+	ret.coloring = COL_map();
+	ret.il=il;
+
 	return ret;
 }

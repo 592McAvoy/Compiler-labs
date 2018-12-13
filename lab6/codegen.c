@@ -27,7 +27,7 @@ static bool isPlainExp(T_exp e){
 static Temp_temp RMfp(){
     Temp_temp n = Temp_newtemp();
     char s[100];
-    sprintf(s, "movq %s(`s0), `d0", fsStr);
+    sprintf(s, "leaq %s(`s0), `d0", fsStr);
     emit(AS_Move(String(s), Temp_TempList(n,NULL), Temp_TempList(F_SP(),NULL)));
     return n;
 }
@@ -202,6 +202,16 @@ static Temp_temp munchExp(T_exp e){
                case T_lshift: case T_rshift: case T_arshift:
                case T_xor:EM_impossible("unsupported T_Binop operation");assert(0);
             }
+
+            if(e->u.BINOP.left->kind == T_TEMP){
+                Temp_temp n = Temp_newtemp();
+                emit(AS_Move("movq `s0, `d0", Temp_TempList(n,NULL), Temp_TempList(left,NULL)));
+            
+                emit(AS_Oper(opstr, Temp_TempList(n, NULL),
+                        Temp_TempList(n, Temp_TempList(right,NULL)), NULL));
+                return n;
+            }
+            
             emit(AS_Oper(opstr, Temp_TempList(left, NULL),
                         Temp_TempList(left, Temp_TempList(right,NULL)), NULL));
             return left;
@@ -262,7 +272,7 @@ static Temp_temp munchExp(T_exp e){
             if (t == F_FP()){
                 t=RMfp();
             }
-            return t;
+           return t;
         }
         case T_ESEQ:{
             EM_impossible("T_ESEQ exp should not exist");
@@ -352,7 +362,7 @@ AS_instrList F_codegen(F_frame f, T_stmList stmList) {
 
     /*miscellaneous initializations as necessary */
     char init[100];
-    sprintf(init, "subq %s, `d0", fsStr);
+    sprintf(init, "subq $%s, `d0", fsStr);
     emit(AS_Oper(String(init), Temp_TempList(F_SP(),NULL), Temp_TempList(F_SP(),NULL), NULL));
 
     for (T_stmList sl=stmList; sl; sl = sl->tail){
@@ -360,7 +370,7 @@ AS_instrList F_codegen(F_frame f, T_stmList stmList) {
         munchStm(stm);
     }  
     char fini[100];
-    sprintf(fini, "addq %s, `d0", fsStr);
+    sprintf(fini, "addq $%s, `d0", fsStr);
     emit(AS_Oper(String(fini), Temp_TempList(F_SP(),NULL), Temp_TempList(F_SP(),NULL), NULL));
 
     list = F_procEntryExit2(asList);

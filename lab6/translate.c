@@ -10,7 +10,8 @@
 
 //LAB5: you can modify anything you want.
 
-F_fragList frags = NULL;
+F_fragList funcfrags = NULL;
+F_fragList strfrags = NULL;
 
 struct Tr_access_ {
 	Tr_level level;
@@ -183,7 +184,7 @@ void Tr_print(Tr_exp e){
 Tr_level Tr_outermost(void){
 	Tr_level l = checked_malloc(sizeof(*l));
 
-	Temp_label lab = Temp_newlabel();
+	Temp_label lab = Temp_namedlabel("tigermain");
 	l->frame = F_newFrame(lab, NULL);
 	l->parent = NULL;
 	return l;
@@ -277,14 +278,16 @@ Tr_exp Tr_intExp(int i){
 Tr_exp Tr_stringExp(string str){
     Temp_label lab = Temp_newlabel();
     F_frag strf = F_StringFrag(lab, str);
-    frags = F_FragList(strf, frags);
+    strfrags = F_FragList(strf, strfrags);
     return Tr_Ex(T_Name(lab));
 }
 Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl, string func){
     T_expList args = NULL;
+    int cnt = 0;
     for(Tr_expList l=params; l; l=l->tail){
         Tr_exp param = l->head;
         args = T_ExpList(unEx(param), args);
+        cnt+=1;
     }
     if(!fname){
         return Tr_Ex(F_externalCall(func, args));
@@ -300,9 +303,11 @@ Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level env
 	}
     args = T_ExpList(fp, args);
 
-    Tr_exp tmp = Tr_Ex(T_Call(T_Name(fname), args));
-    //Tr_print(tmp);
-    //printf("call over\n");
+    //alloc space for spilled args
+    while(cnt>5){
+        F_allocLocal(envl->frame, TRUE);
+        cnt -= 1;
+    }
 
     return Tr_Ex(T_Call(T_Name(fname), args));
 }
@@ -380,44 +385,63 @@ Tr_exp Tr_recordExp(Tr_expList list, int cnt){
 }
 Tr_exp Tr_SeqExp(Tr_expList list){
     T_exp e = unEx(list->head);
-    T_stm s = NULL;
+    T_exp s = NULL;
     Tr_expList p;
     for(p=list->tail;p;p=p->tail){
         if(s){
-            s = T_Seq(unNx(p->head),s);
+            s = T_Eseq(unNx(p->head),s);
         }
         else{
-            s = unNx(p->head);
+            s = T_Eseq(unNx(p->head),e);
         }
     }
     if(!s){
         return Tr_Ex(e);
     }
-    return Tr_Ex(T_Eseq(s,e));
+    return Tr_Ex(s);
 }
 Tr_exp Tr_assignExp(Tr_exp pos, Tr_exp val){
     return Tr_Nx(T_Move(unEx(pos), unEx(val)));
 }
-Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee){
+Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee, Ty_ty type){
     Temp_label t = Temp_newlabel();
     Temp_label f = Temp_newlabel();
     Temp_label next = Temp_newlabel();
+
     struct Cx testCx = unCx(test);
     doPatch(testCx.trues, t);
     doPatch(testCx.falses,f);
 
     T_stm testStm = testCx.stm;//Cx(t,f)
+
+    if(type->kind == Ty_void){
+        T_stm thenStm = unNx(then);
+        T_stm elseStm = unNx(elsee);
+        T_exp e = T_Eseq(testStm,
+                T_Eseq(T_Label(t),
+                    T_Eseq(thenStm, 
+                        T_Eseq(T_Jump(T_Name(next), Temp_LabelList(next,NULL)),
+                            T_Eseq(T_Label(f),
+                                T_Eseq(elseStm,
+                                    T_Eseq(T_Jump(T_Name(next), Temp_LabelList(next,NULL)),
+                                        T_Eseq(T_Label(next), T_Const(0)))))))));
+
+        return Tr_Nx(T_Exp(e));
+    }
+
     T_exp thenexp = unEx(then);
     T_exp elseexp = unEx(elsee);
 
     Temp_temp r = Temp_newtemp();
-
+    
     T_exp e = T_Eseq(testStm,
                 T_Eseq(T_Label(t),
-                    T_Eseq(T_Seq(T_Move(T_Temp(r),thenexp), T_Jump(T_Name(next), Temp_LabelList(next,NULL))),
-                        T_Eseq(T_Label(f),
-                            T_Eseq(T_Seq(T_Move(T_Temp(r),elseexp), T_Jump(T_Name(next), Temp_LabelList(next,NULL))),
-                                T_Eseq(T_Label(next), T_Temp(r)))))));
+                    T_Eseq(T_Move(T_Temp(r),thenexp), 
+                        T_Eseq(T_Jump(T_Name(next), Temp_LabelList(next,NULL)),
+                            T_Eseq(T_Label(f),
+                                T_Eseq(T_Move(T_Temp(r),elseexp), 
+                                    T_Eseq(T_Jump(T_Name(next), Temp_LabelList(next,NULL)),
+                                        T_Eseq(T_Label(next), T_Temp(r)))))))));
     return Tr_Ex(e);
 }
 Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
@@ -431,14 +455,14 @@ Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label done){
     
     T_stm testStm = testCx.stm;
 
-    T_stm s = T_Seq(T_Label(check),
-                T_Seq(testStm,
-                    T_Seq(T_Label(run),
-                        T_Seq(unNx(body),
-                            T_Seq(T_Jump(T_Name(check),Temp_LabelList(check,NULL)),
-                                T_Label(done))))));
+    T_exp e = T_Eseq(T_Label(check),
+                T_Eseq(testStm,
+                    T_Eseq(T_Label(run),
+                        T_Eseq(unNx(body),
+                            T_Eseq(T_Jump(T_Name(check),Temp_LabelList(check,NULL)),
+                                T_Eseq(T_Label(done),T_Const(0)))))));
     
-    return Tr_Nx(s);
+    return Tr_Nx(T_Exp(e));
 }
 Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done){
     T_exp low = unEx(lo);
@@ -448,44 +472,55 @@ Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label do
     Temp_label pass = Temp_newlabel();
 
     T_stm init = T_Move(i,low);
-    T_stm test = T_Cjump(T_le, i, high, loop, done);
-    T_stm update = T_Exp(T_Binop(T_plus, i, T_Const(1)));
-    T_stm bodyy = unNx(body);
+    T_stm update = T_Move(i,T_Binop(T_plus, i, T_Const(1)));
+    T_stm bodyy1 = unNx(body);
+    T_stm bodyy2 = unNx(body);
 
-    T_stm s = T_Seq(init,
-                T_Seq(T_Cjump(T_le, i, high, pass, done),
-                    T_Seq(T_Label(pass),
-                        T_Seq(bodyy,
-                            T_Seq(T_Cjump(T_ne, i, high, loop, done),
-                                T_Seq(T_Label(loop),
-                                    T_Seq(update,
-                                        T_Seq(bodyy, 
-                                            T_Seq(test, T_Label(done))))))))));
-    return Tr_Nx(s);
+    /*
+    T_exp e = T_Eseq(init,
+                T_Eseq(T_Cjump(T_gt, i,high, done, pass),
+                    T_Eseq(T_Label(pass),
+                        T_Eseq(unNx(body),
+                            T_Eseq(T_Cjump(T_eq, i, high, done, loop),
+                                T_Eseq(T_Label(loop), 
+                                    T_Eseq(update,
+                                        T_Eseq(bodyy2,
+                                            T_Eseq(T_Cjump(T_le, i, high, loop, done),
+                                                T_Eseq(T_Label(done), T_Const(0)))))))))));*/
+    T_exp e = T_Eseq(init,
+                    T_Eseq(T_Cjump(T_le, i, high, loop, done),
+                                T_Eseq(T_Label(loop), 
+                                    T_Eseq(bodyy2,
+                                        T_Eseq(update,
+                                            T_Eseq(T_Cjump(T_le, i, high, loop, done),
+                                                T_Eseq(T_Label(done), T_Const(0))))))));
+    //return Tr_Nx(fin);
+    return Tr_Nx(T_Exp(e));
 
 }
 Tr_exp Tr_breakExp(Temp_label done){
     return Tr_Nx(T_Jump(T_Name(done),Temp_LabelList(done,NULL)));
 }
 Tr_exp Tr_letExp(Tr_expList dec, Tr_exp body){
-    T_stm s = NULL;
+    T_exp e = unEx(body);
+    T_exp s = NULL;
     for(Tr_expList p=dec;p;p=p->tail){
         if(s){
-            s = T_Seq(unNx(p->head), s);
+            s = T_Eseq(unNx(p->head), s);
         }
         else{
-            s = unNx(p->head);
+            s = T_Eseq(unNx(p->head), e);
         }
     }
     if(!s){
         return body;
     }
-    return Tr_Ex(T_Eseq(s, unEx(body)));
+    return Tr_Ex(s);
 }
-Tr_exp Tr_arrayExp(int size, Tr_exp initvar){
+Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp initvar){
     Temp_temp r = Temp_newtemp();
     T_exp base = T_Temp(r);
-    T_stm init = T_Move(base, F_externalCall("initArray", T_ExpList(T_Const(size),
+    T_stm init = T_Move(base, F_externalCall("initArray", T_ExpList(unEx(size),
                                                                T_ExpList(unEx(initvar),NULL))));
 
     T_exp finall = T_Eseq(init, base); 
@@ -548,9 +583,13 @@ void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals){
 
 	F_frag proc = F_ProcFrag(s, f);
 
-	frags = F_FragList(proc, frags);
+	funcfrags = F_FragList(proc, funcfrags);
 }
 
 F_fragList Tr_getResult(void){
-	return frags;
+    F_fragList p = strfrags;
+    if(!p) return funcfrags;
+    for(;p->tail;p=p->tail){}
+    p->tail = funcfrags;
+	return strfrags;
 }

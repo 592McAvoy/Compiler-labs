@@ -347,7 +347,8 @@ Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label labe
 					return Tr_typeDec(); 
 				}
 
-				Temp_label fname = Temp_newlabel();
+				//Temp_label fname = Temp_newlabel();
+				Temp_label fname = name;
 				Tr_level newl = Tr_newLevel(l, fname, makeBoolList(params));
 				Ty_tyList formals = makeFormals(tenv, params);
 				
@@ -707,16 +708,16 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 
 			if(actualTy(elsety.ty)->kind == Ty_nil){
 				if(actualTy(thenty.ty)->kind == Ty_void){
-					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), thenty.ty);
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp, thenty.ty), thenty.ty);
 				}
 				else{
 					//EM_error(a->pos, "if-then exp's body must produce no value");
-					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), thenty.ty);
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp, thenty.ty), thenty.ty);
 				}
 			}
 			else{
 				if(actualTy(thenty.ty)->kind == actualTy(elsety.ty)->kind){
-					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp), elsety.ty);
+					return expTy(Tr_ifExp(testty.exp,thenty.exp,elsety.exp, elsety.ty), elsety.ty);
 				}
 				else{
 					EM_error(a->pos, "then exp and else exp type mismatch");
@@ -820,8 +821,8 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_labe
 					EM_error(a->pos, "type mismatch");
 					return expTy(Tr_err(), Ty_Int());
 				}
-				int len = size->u.intt;
-				return expTy(Tr_arrayExp(len, initty.exp), type);
+				//int len = size->u.intt;
+				return expTy(Tr_arrayExp(sizety.exp, initty.exp), type);
 			}
 			else{
 				EM_error(a->pos, "undefined type %s", S_name(typ));

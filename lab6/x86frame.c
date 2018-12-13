@@ -126,12 +126,13 @@ F_access F_allocLocal(F_frame f, bool escape){
 	F_access ac;
 	if(escape){
 		ac = InFrame(-(length+1) * F_wordsize);
+		f->length = length+1;
 	}
 	else{
 		ac = InReg(Temp_newtemp());
 	}
 
-	f->length = length+1;
+	
 	f->locals = F_AccessList(ac, locals);
 
 	return ac;
@@ -368,20 +369,28 @@ T_stm F_procEntryExit1(F_frame f, T_stm stm){
 		}
 	}
 
-	T_stm ness = T_Seq(save,T_Seq(stm, restore));
-	
 	if(!view){
-		return ness;
+		return T_Seq(save,T_Seq(stm, restore));
 	}
-	return T_Seq(view,ness);
+	return T_Seq(save,T_Seq(view, T_Seq(stm, restore)));
 }
 AS_instrList F_procEntryExit2(AS_instrList body){
 	static Temp_tempList returnSink = NULL ;
 	if (!returnSink)  
 		returnSink = Temp_TempList(F_SP(), F_calleeSave());
     return AS_splice(body, 
-				AS_InstrList(AS_Oper("", NULL, returnSink, NULL), NULL));
+				AS_InstrList(AS_Oper("ret", NULL, returnSink, NULL), NULL));
 
 }
-AS_proc F_procEntryExit3(F_frame frame, AS_instrList body);
+AS_proc F_procEntryExit3(F_frame frame, AS_instrList body){
+	int len = frame->length;
+	string fn =  S_name(F_name(frame));
+	char target[100];
+	char length[20];
+	sprintf(target, "%s_framesize", fn);
+	sprintf(length, "%d", F_wordsize*len);
+	AS_rewriteFrameSize(body, target, length);
+
+	return AS_Proc("", body, "");
+}
 

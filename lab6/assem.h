@@ -44,7 +44,8 @@ AS_proc AS_Proc(string p, AS_instrList b, string e);
 
 
 //TA's implementation. Just for reference.
-//void AS_rewrite(AS_instrList iList, Temp_map m);
+void AS_rewrite(AS_instrList iList, Temp_map m);
+void AS_rewriteFrameSize(AS_instrList iList, string target, string len);
 //typedef struct F_frame_ *F_frame;
 //AS_instrList AS_rewriteSpill(F_frame f, AS_instrList il, Temp_tempList spills);
 

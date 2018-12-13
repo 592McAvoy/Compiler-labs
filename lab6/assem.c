@@ -110,7 +110,7 @@ static void format(char *result, string assem,
         {
           int n = atoi(++p);
           string s = Temp_labelstring(nthLabel(jumps->labels,n));
-          strcpy(result+i, s);
+          strcpy(result+i,s);
           i += strlen(s);
         }
         break;
@@ -168,4 +168,61 @@ AS_proc AS_Proc(string p, AS_instrList b, string e)
 {AS_proc proc = checked_malloc(sizeof(*proc));
  proc->prolog=p; proc->body=b; proc->epilog=e;
  return proc;
+}
+
+
+void AS_rewrite(AS_instrList iList, Temp_map m){
+  AS_instrList p = iList;
+  AS_instrList last = NULL;
+  for(;p;p=p->tail){
+    AS_instr ins = p->head;
+    if(ins->kind == I_MOVE){
+        Temp_tempList dst = ins->u.MOVE.dst;
+				Temp_tempList src = ins->u.MOVE.src;
+				string ass = ins->u.MOVE.assem;				
+				if(strstr(ass,"movq `s0, `d0")){
+          string s = Temp_look(m, src->head);
+          string d = Temp_look(m, dst->head);
+					if(!strcmp(s,d)){
+            assert(last);
+            last->tail = p->tail;  
+            continue;          
+          }          
+				}
+    }
+    last = p;
+  }
+}
+
+char *strrpc(char *str,char *oldstr,char *newstr){
+    char bstr[strlen(str)];//转换缓冲区
+    memset(bstr,0,sizeof(bstr));
+ 
+    for(int i = 0;i < strlen(str);i++){
+        if(!strncmp(str+i,oldstr,strlen(oldstr))){//查找目标字符串
+            strcat(bstr,newstr);
+            i += strlen(oldstr) - 1;
+        }else{
+        	strncat(bstr,str + i,1);//保存一字节进缓冲区
+	    }
+    }
+ 
+    strcpy(str,bstr);
+    return str;
+}
+
+void AS_rewriteFrameSize(AS_instrList iList, string target, string len){
+  AS_instrList p = iList;
+  AS_instrList last = NULL;
+  for(;p;p=p->tail){
+    AS_instr ins = p->head;
+    string ass = ins->u.MOVE.assem;
+    if(strstr(ass, target)){
+      char *n = strrpc(ass, target, len);
+      //printf("after rpl:%s\n", n);
+      ins->u.MOVE.assem = String(n);
+    }
+    
+  }
+
 }

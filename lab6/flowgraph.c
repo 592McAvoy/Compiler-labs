@@ -105,7 +105,7 @@ G_graph FG_AssemFlowGraph(AS_instrList il) {
 	waits =NULL;
 
 	bool prevLab = FALSE;
-	Temp_label lab = NULL;
+	Temp_labelList lab = NULL;
 	G_node prevNode = NULL;
 	//generate flow graph
 	for(AS_instrList ls=il; ls; ls=ls->tail){
@@ -113,7 +113,7 @@ G_graph FG_AssemFlowGraph(AS_instrList il) {
 		switch(ins->kind){
 			case I_LABEL:{
 				prevLab = TRUE;
-				lab = ins->u.LABEL.label; 
+				lab = Temp_LabelList(ins->u.LABEL.label, lab); 
 				break;
 			}
 			case I_MOVE:{
@@ -131,7 +131,8 @@ G_graph FG_AssemFlowGraph(AS_instrList il) {
 					G_addEdge(prevNode, node);
 				}
 				if(prevLab){
-					labels = LabelNodeList(LabelNode(node, lab, NULL),labels);
+					for(;lab;lab=lab->tail)
+						labels = LabelNodeList(LabelNode(node, lab->head, NULL),labels);
 					prevLab = FALSE;
 				}
 
