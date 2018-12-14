@@ -413,18 +413,23 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 		
 	AssignColor();
 
+	Temp_map map = Temp_layerMap(COL_map(),Temp_layerMap(F_tempMap, Temp_name()));
+	
 	if(spilledNode){
 		printf("\n-------==== spillnode =====-----\n");
 		G_show(stdout, spilledNode, RA_showInfo);
 		COL_clearMap();
+		AS_instrList nil = AS_rewriteSpill(f, il, spilledNode);
+		printf("\n");
+		//AS_printInstrList (stdout, nil, map);
+		return RA_regAlloc(f, nil);
 		assert(0);
 	}
 
-	Temp_map map = Temp_layerMap(COL_map(),Temp_layerMap(F_tempMap, Temp_name()));
 	AS_rewrite(il, map);
 		//printf("BEGIN function\n");
-		//AS_printInstrList (stdout, il, map);
- 		//printf("END function\n");
+		AS_printInstrList (stdout, il, map);
+ 		printf("\n-------==== after RA =====-----\n");
 					
 
 	struct RA_result ret;

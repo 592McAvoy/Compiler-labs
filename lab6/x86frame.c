@@ -28,6 +28,7 @@ struct F_frame_ {
 
 	//register lists for the frame
 	F_accessList calleesaves;
+	F_accessList callersaves;
 };
 
 //varibales
@@ -47,6 +48,9 @@ static F_access InFrame(int offset){
 	ac->u.offset = offset;
 	return ac;
 }   
+int F_getFrameOff(F_access acc){
+	return acc->u.offset;
+}
 
 static F_access InReg(Temp_temp reg){
 	F_access ac = checked_malloc(sizeof(*ac));
@@ -83,6 +87,24 @@ F_accessList makeFormalsF(F_frame f, U_boolList formals, int* cntp){
 	}
 }
 
+F_accessList F_callerPos(F_frame f){
+	Temp_tempList regs =  F_callerSave();
+	F_accessList l = NULL;
+	F_accessList last = NULL;
+	for(;regs;regs=regs->tail){
+		F_access acc = F_allocLocal(f,FALSE);
+		if(!last){
+			last = F_AccessList(acc, NULL);
+			l = last;
+		}
+		else{
+			last->tail = F_AccessList(acc, NULL);
+			last = last->tail;
+		}
+	}
+	return l;
+}
+
 F_accessList F_calleePos(F_frame f){
 	Temp_tempList regs = F_calleeSave();
 	F_accessList l = NULL;
@@ -114,6 +136,7 @@ F_frame F_newFrame(Temp_label name, U_boolList formals){
 	
 
 	f->calleesaves = F_calleePos(f);
+	f->callersaves = F_callerPos(f);
 
 	return f;
 }
@@ -144,7 +167,9 @@ Temp_label F_name(F_frame f){
 F_accessList F_formals(F_frame f){
 	return f->formals;
 }
-
+int F_len(F_frame f){
+	return f->length;
+}
 /* IR translation */
 Temp_temp F_FP(void){
 	static Temp_temp fp  = NULL;
@@ -211,7 +236,18 @@ Temp_temp F_ARG(int idx){
 		default:assert(0);
 	}
 }
-
+Temp_tempList F_Args(){
+	static Temp_tempList args = NULL;
+	if(!args){
+		args = Temp_TempList(F_ARG(0),
+					Temp_TempList(F_ARG(1),
+					Temp_TempList(F_ARG(2),
+					Temp_TempList(F_ARG(3),
+					Temp_TempList(F_ARG(4),
+					Temp_TempList(F_ARG(5),NULL))))));
+	}
+	return args;
+}
 Temp_tempList F_callerSave(){
 	static Temp_tempList callerSave = NULL;
 	static Temp_temp r10 = NULL;
@@ -221,7 +257,7 @@ Temp_tempList F_callerSave(){
 		Temp_enter(F_tempMap, r10, "%r10");
 		r11 = Temp_newtemp();
 		Temp_enter(F_tempMap, r11, "%r11");
-		callerSave = Temp_TempList(r10, Temp_TempList(r11, NULL));
+		callerSave = Temp_catList(F_Args(), Temp_TempList(r10, Temp_TempList(r11, NULL)));
 	}
 	return callerSave;
 }
@@ -261,15 +297,8 @@ Temp_tempList F_register(){
 	if(!regs){
 		regs = Temp_TempList(F_SP(),
 					Temp_TempList(F_RV(),
-					Temp_TempList(F_ARG(0),
-					Temp_TempList(F_ARG(1),
-					Temp_TempList(F_ARG(2),
-					Temp_TempList(F_ARG(3),
-					Temp_TempList(F_ARG(4),
-					Temp_TempList(F_ARG(5), F_calleeSave()))))))));
-		Temp_tempList p;
-		for(p=regs;p->tail;p=p->tail){}
-		p->tail = F_callerSave();
+						F_calleeSave()));
+		regs = Temp_catList(regs, F_callerSave());
 	}
 	return regs;											
 }
@@ -315,6 +344,43 @@ F_fragList F_FragList(F_frag head, F_fragList tail) {
 	return l;                                      
 }                                                     
 
+T_exp F_procChange(F_frame f, T_exp call){
+	T_exp fp = T_Temp(F_FP());
+	//caller save
+	T_stm save = NULL;
+	F_accessList al = f->callersaves;
+	Temp_tempList tl = F_callerSave();
+	for(;tl;tl=tl->tail, al=al->tail){
+		T_exp pos = F_exp(al->head, fp);
+		if(save){
+			save = T_Seq(T_Move(pos, T_Temp(tl->head)), save);
+		}
+		else{
+			save = T_Move(pos, T_Temp(tl->head));
+		}
+	}
+
+	//caller restore
+	T_stm restore = NULL;
+	al = f->callersaves;
+	tl = F_callerSave();
+	for(;tl;tl=tl->tail, al=al->tail){
+		T_exp pos = F_exp(al->head, fp);
+		if(restore){
+			restore = T_Seq(T_Move(T_Temp(tl->head),pos), restore);
+		}
+		else{
+			restore = T_Move(T_Temp(tl->head), pos);
+		}
+	}
+
+	Temp_temp t = Temp_newtemp();
+	T_exp e = T_Eseq(save,
+				T_Eseq(T_Move(T_Temp(t), call),
+					T_Eseq(restore, T_Temp(t))));
+	return e;
+
+}
 
 T_stm F_procEntryExit1(F_frame f, T_stm stm){
 	//view change

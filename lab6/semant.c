@@ -194,9 +194,6 @@ F_fragList SEM_transProg(A_exp e){
 	tenv = E_base_tenv();
 	recursive = 0;
 
-	//Find escape
-	Esc_findEscape(e);
-
 	Temp_label prog = Temp_newlabel();
 	Tr_level l = Tr_outermost();
 

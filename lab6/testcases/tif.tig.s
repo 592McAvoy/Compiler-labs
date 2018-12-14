@@ -21,8 +21,8 @@ ret
 g:
 subq $8, %rsp
 .L7:
-leaq 8(%rsp), %r11
-movq %rdi, -8(%r11)
+leaq 8(%rsp), %rax
+movq %rdi, -8(%rax)
 cmpq %rdx, %rsi
 jg .L1
 .L2:

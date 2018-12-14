@@ -66,48 +66,7 @@ static bool inPool(Temp_temp t){
 	cnt += 1;
 	return FALSE;
 }
-bool inList(Temp_tempList list, Temp_temp t){
-	for(;list;list=list->tail){
-		Temp_temp tt = list->head;
-		if(Temp_int(tt) == Temp_int(t)){
-			return TRUE;
-		}
-	}
-	return FALSE;
-}
 
-
-Temp_tempList Union(Temp_tempList A, Temp_tempList B){
-	Temp_tempList list = NULL;
-	for(;A;A=A->tail){
-		Temp_temp tt = A->head;
-		list = Temp_TempList(tt, list);
-	}
-	//Temp_tempList list = A;
-	for(;B;B=B->tail){
-		Temp_temp tt = B->head;
-		if(!inList(A, tt)){
-			list = Temp_TempList(tt, list);
-		}
-	}
-	return list;
-}
-Temp_tempList Minus(Temp_tempList A, Temp_tempList B){
-	Temp_tempList list = NULL;
-	for(;A;A=A->tail){
-		Temp_temp tt = A->head;
-		if(!inList(B, tt)){
-			list = Temp_TempList(tt, list);
-		}
-	}
-	return list;
-}
-bool Equal(Temp_tempList A, Temp_tempList B){
-	if(Minus(A,B)==NULL && Minus(B,A)==NULL){
-		return TRUE;
-	}
-	return FALSE;
-}
 
 //procedure
 Temp_temp Live_gtemp(G_node n) {
@@ -166,13 +125,13 @@ static void loopAnalyse(){
 				G_node succ = sp->head;
 				liveInfo tmp = TAB_look(liveTab, succ);
 				assert(tmp);
-				out = Union(out, tmp->in);
+				out = Temp_Union(out, tmp->in);
 			}
 
-			Temp_tempList in = Union(FG_use(fnode), Minus(out, FG_def(fnode)));
+			Temp_tempList in = Temp_Union(FG_use(fnode), Temp_Minus(out, FG_def(fnode)));
 			//Temp_tempList in = Minus(Union(out, FG_use(fnode)), FG_def(fnode));
 
-			if(!Equal(in, old->in) || !Equal(out, old->out)){
+			if(!Temp_Equal(in, old->in) || !Temp_Equal(out, old->out)){
 				stable = FALSE;
 			}
 
@@ -189,18 +148,19 @@ static void addConf(){
 
 		//move
 		if(FG_isMove(fnode)){
-			live = Minus(live, FG_use(fnode));
+			live = Temp_Minus(live, FG_use(fnode));
 
 			Temp_temp dst = FG_def(fnode)->head;
 			G_node d = TAB_look(TNtab, dst);
 			Temp_temp src = FG_use(fnode)->head;
 			G_node s = TAB_look(TNtab, src);
+
 			movs = Live_MoveList(s, d, movs);
 		}
 
 		//add conflicts 
 		Temp_tempList def = FG_def(fnode);
-		live = Union(live, def);
+		live = Temp_Union(live, def);
 		for(Temp_tempList p1=def;p1;p1=p1->tail){
 			G_node cf1 = TAB_look(TNtab, p1->head);
 			for(Temp_tempList p2=live;p2;p2=p2->tail){

@@ -20,6 +20,8 @@ F_frame F_newFrame(Temp_label name, U_boolList formals);
 Temp_label F_name(F_frame f);
 F_accessList F_formals(F_frame f);
 F_access F_allocLocal(F_frame f, bool escape);
+int F_len(F_frame f);
+int F_getFrameOff(F_access acc);
 
 /* temp map*/
 Temp_map F_tempMap;
@@ -30,6 +32,7 @@ Temp_temp F_SP(void);//stack ptr
 Temp_temp F_RV(void);//return value
 Temp_temp F_ARG(int idx);//func arg_i
 
+Temp_tempList F_Args();//func regs
 Temp_tempList F_callerSave();//callersave regs
 Temp_tempList F_calleeSave();//calleesave regs
 Temp_tempList F_register();//all regs
@@ -39,6 +42,7 @@ T_exp F_exp(F_access acc, T_exp framePtr);
 T_exp F_externalCall(string s, T_expList args);
 
 /* procedure complement */
+T_exp F_procChange(F_frame f, T_exp call);
 T_stm F_procEntryExit1(F_frame f, T_stm stm);
 AS_instrList F_procEntryExit2(AS_instrList body);
 AS_proc F_procEntryExit3(F_frame frame, AS_instrList body);

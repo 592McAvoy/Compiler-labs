@@ -10,10 +10,10 @@
 typedef struct escapeEntry_ *escapeEntry;
 struct escapeEntry_ {
 	int depth;
-    bool *escape;
+    bool* escape;
 };
 
-escapeEntry EscapeEntry(int d, bool *esc);
+escapeEntry EscapeEntry(int d, bool *e);
 
 void Esc_findEscape(A_exp exp);
 

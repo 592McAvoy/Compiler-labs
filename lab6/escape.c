@@ -60,8 +60,9 @@ traverseExp(S_table table, int depth, A_exp a){
 		case A_assignExp:{
 			A_var var = get_assexp_var(a); 
 			A_exp ex = get_assexp_exp(a);
-
-			return traverseExp(table, depth, ex);
+			traverseVar(table, depth, var);
+			traverseExp(table, depth, ex);
+			return ;
 		} 
 		case A_ifExp:{
 			A_exp test = get_ifexp_test(a); 
@@ -147,8 +148,8 @@ traverseDec(S_table table, int depth, A_dec d){
 				A_fieldList params = func->params; 
 		 		for(A_fieldList ls=params;ls;ls=ls->tail){
 					A_field param = ls->head;
-					S_enter(table, param->name, EscapeEntry(depth+1, &(param->escape)));
-					param->escape = 0;
+					S_enter(table, param->name, EscapeEntry(depth+1, &param->escape));
+					param->escape = FALSE;
 				 }
 				A_exp body = func->body;
 				traverseExp(table, depth+1, body);
@@ -159,9 +160,9 @@ traverseDec(S_table table, int depth, A_dec d){
 		case A_varDec:{
 			S_symbol var = get_vardec_var(d);
 			A_exp init = get_vardec_init(d);
-			//printf("dec %s\n",S_name(var));
-			d->u.var.escape = 0;
-			S_enter(table, var, EscapeEntry(depth, &(d->u.var.escape)));			
+			//printf("vardec %s\tdepth:%d\n",S_name(var),depth);
+			d->u.var.escape = FALSE;
+			S_enter(table, var, EscapeEntry(depth, &d->u.var.escape));			
 			traverseExp(table, depth, init);
 			return;
 		}		
@@ -177,10 +178,11 @@ traverseVar(S_table table, int depth, A_var v){
 	switch(v->kind){
 		case A_simpleVar:{
 			S_symbol simple = get_simplevar_sym(v);
-			//printf("var %s\n",S_name(simple));
 			escapeEntry esc = S_look(table, simple);
+			//printf("var %s\tdepth %d\n",S_name(simple),depth);
 			if(esc && depth > esc->depth){
-				*esc->escape = 1;
+				//printf("escape var %s\n",S_name(simple));
+				*esc->escape = TRUE;
 			}
 			return;
 		}
@@ -202,10 +204,10 @@ traverseVar(S_table table, int depth, A_var v){
 	}
 }
 
-escapeEntry EscapeEntry(int d, bool *esc){
+escapeEntry EscapeEntry(int d, bool* e){
 	escapeEntry entry = checked_malloc(sizeof(*entry));
 	entry->depth = d;
-	entry->escape = esc;
+	entry->escape = e;
 	return entry;
 }
 

@@ -283,12 +283,20 @@ Tr_exp Tr_stringExp(string str){
 }
 Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level envl, string func){
     T_expList args = NULL;
+    F_frame envf = envl->frame;
     int cnt = 0;
     for(Tr_expList l=params; l; l=l->tail){
         Tr_exp param = l->head;
         args = T_ExpList(unEx(param), args);
         cnt+=1;
     }
+
+    //alloc space for spilled args
+    while(cnt>5){
+        F_allocLocal(envf, TRUE);
+        cnt -= 1;
+    }
+    
     if(!fname){
         return Tr_Ex(F_externalCall(func, args));
     }
@@ -302,12 +310,6 @@ Tr_exp Tr_callExp(Temp_label fname, Tr_expList params, Tr_level fl, Tr_level env
 		envl = envl->parent;
 	}
     args = T_ExpList(fp, args);
-
-    //alloc space for spilled args
-    while(cnt>5){
-        F_allocLocal(envl->frame, TRUE);
-        cnt -= 1;
-    }
 
     return Tr_Ex(T_Call(T_Name(fname), args));
 }
@@ -468,6 +470,7 @@ Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label do
     T_exp low = unEx(lo);
     T_exp high = unEx(hi);    
     T_exp i = unEx(forvar);
+
     Temp_label loop = Temp_newlabel();
     Temp_label pass = Temp_newlabel();
 
@@ -488,7 +491,7 @@ Tr_exp Tr_forExp(Tr_exp forvar, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label do
                                             T_Eseq(T_Cjump(T_le, i, high, loop, done),
                                                 T_Eseq(T_Label(done), T_Const(0)))))))))));*/
     T_exp e = T_Eseq(init,
-                    T_Eseq(T_Cjump(T_le, i, high, loop, done),
+                    T_Eseq(T_Cjump(T_gt, i, high, done, loop),
                                 T_Eseq(T_Label(loop), 
                                     T_Eseq(bodyy2,
                                         T_Eseq(update,

@@ -161,7 +161,7 @@ static void munchStm(T_stm stm){
                     }
                     if(!isPlainExp(right)){
                         Temp_temp d = munchExp(right);
-                        MemOp(s, d, left);
+                        MovOp(s, d, left);
                         return;
                     }
                     else{
@@ -182,6 +182,7 @@ static void munchStm(T_stm stm){
 	    
     }
 }
+
 static Temp_temp munchExp(T_exp e){
     switch(e->kind){        
         case T_BINOP:{  /*op S, D  :  D = D op S */
@@ -195,7 +196,8 @@ static Temp_temp munchExp(T_exp e){
                case T_mul:opstr = "imulq `s1, `d0";break;
                case T_div:{
                    emit(AS_Move("movq `s0, `d0",Temp_TempList(F_RV(),NULL),Temp_TempList(left,NULL)));
-                   emit(AS_Oper("idivq `s0", Temp_TempList(F_RV(),NULL), Temp_TempList(right,NULL), NULL));
+                   emit(AS_Oper("cqto",Temp_TempList(F_RV(),Temp_TempList(F_ARG(2), NULL)),NULL,NULL));
+                   emit(AS_Oper("idivq `s0", Temp_TempList(F_RV(),Temp_TempList(F_ARG(2), NULL)), Temp_TempList(right,NULL), NULL));
                    return F_RV();
                } 
                case T_and: case T_or:
