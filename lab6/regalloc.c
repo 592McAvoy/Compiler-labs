@@ -409,6 +409,7 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 			SelectSpill();
 		}
 	}
+	//printf("\n-------==== loop over =====-----\n");
 	//printMovs();
 		
 	AssignColor();

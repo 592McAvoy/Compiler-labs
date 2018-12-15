@@ -525,7 +525,7 @@ Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp initvar){
     T_exp base = T_Temp(r);
     T_stm init = T_Move(base, F_externalCall("initArray", T_ExpList(unEx(size),
                                                                T_ExpList(unEx(initvar),NULL))));
-
+    //T_stm init = T_Move(base, F_externalCall("malloc", T_ExpList(T_Binop(T_mul, T_Const(F_wordsize),unEx(size)),NULL)));
     T_exp finall = T_Eseq(init, base); 
     return Tr_Ex(finall);   
 } 

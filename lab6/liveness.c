@@ -125,7 +125,7 @@ static void loopAnalyse(){
 				G_node succ = sp->head;
 				liveInfo tmp = TAB_look(liveTab, succ);
 				assert(tmp);
-				out = Temp_Union(out, tmp->in);
+				out = Temp_UnionCombine(out, tmp->in);
 			}
 
 			Temp_tempList in = Temp_Union(FG_use(fnode), Temp_Minus(out, FG_def(fnode)));
@@ -182,14 +182,14 @@ struct Live_graph Live_liveness(G_graph flow) {
 	revFlow = NULL;
 	liveTab = TAB_empty();
 	TNtab = TAB_empty();
-	movs = NULL;
+	movs = NULL;	
 
 	//generate a empty conflict graph with no edge in it 
 	genGraph(flow);
 	
 	//loop find in/out
 	loopAnalyse();
-
+	
 	//add conflict edges according to [in]
 	addConf();
 	

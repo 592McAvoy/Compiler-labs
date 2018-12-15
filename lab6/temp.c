@@ -156,6 +156,16 @@ Temp_tempList Temp_Union(Temp_tempList A, Temp_tempList B){
 	}
 	return list;
 }
+Temp_tempList Temp_UnionCombine(Temp_tempList A, Temp_tempList B){
+  Temp_tempList list = A;
+	for(;B;B=B->tail){
+		Temp_temp tt = B->head;
+		if(!Temp_inList(A, tt)){
+			list = Temp_TempList(tt, list);
+		}
+	}
+	return list;
+}
 Temp_tempList Temp_Minus(Temp_tempList A, Temp_tempList B){
 	Temp_tempList list = NULL;
 	for(;A;A=A->tail){

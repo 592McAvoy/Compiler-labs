@@ -73,8 +73,8 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
  //printf("----======before RA=======-----\n");
 
  
-
- struct RA_result ra = RA_regAlloc(frame, iList);  /* 11 */
+/* 11 */
+ struct RA_result ra = RA_regAlloc(frame, iList);  
 
   //Part of TA's implementation. Just for reference.
  
